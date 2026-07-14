@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>髪ネタ動画メーカー v5</title>
+<title>髪ネタ動画メーカー v5.1</title>
 <style>
   :root{
     --bg:#1c1a1f; --surface:#27242b; --surface2:#312d36;
@@ -72,7 +73,7 @@
 </head>
 <body>
 
-<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v5</small></h1>
+<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v5.1</small></h1>
 <div class="tag">質問を入れる → 台本を直す → キューに積んで次へ。</div>
 
 <!-- 設定 -->
@@ -569,29 +570,43 @@ async function recordJob(job){
     sources.push(src);
   }
   const startMs = performance.now() + 100;
-  await new Promise(resolve=>{
-    function frame(){
-      const el = (performance.now()-startMs)/1000;
-      if(el >= total){ resolve(); return; }
-      let cur = items[0];
-      for(const it of items){ if(el >= it.start) cur = it; }
-      const t = Math.min(1, Math.max(0,(el-cur.start)/cur.dur));
-      renderSlide(hctx, {
-        text: job.slides[cur.idx],
-        img: job.imgs[cur.idx],
-        isHook: cur.idx===0,
-        theme: job.theme,
-        badge: job.badge,
-        zoom: job.zoom,
-      }, t);
-      job.detail = "残り"+Math.max(0,Math.ceil(total-el))+"秒";
-      updateChip();
-      requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
+  // rAFはSafariに止められることがあるため、タイマー方式+安全装置で回す
+  await new Promise((resolve)=>{
+    let finished = false;
+    const finish = ()=>{
+      if(finished) return;
+      finished = true;
+      clearInterval(iv);
+      clearTimeout(guard);
+      resolve();
+    };
+    const iv = setInterval(()=>{
+      try{
+        const el = (performance.now()-startMs)/1000;
+        if(el >= total){ finish(); return; }
+        let cur = items[0];
+        for(const it of items){ if(el >= it.start) cur = it; }
+        const t = Math.min(1, Math.max(0,(el-cur.start)/cur.dur));
+        renderSlide(hctx, {
+          text: job.slides[cur.idx],
+          img: job.imgs[cur.idx],
+          isHook: cur.idx===0,
+          theme: job.theme,
+          badge: job.badge,
+          zoom: job.zoom,
+        }, t);
+        job.detail = "残り"+Math.max(0,Math.ceil(total-el))+"秒";
+        updateChip();
+      }catch(e){
+        finish();
+      }
+    }, 50);
+    // 安全装置: 予定時間+3秒で必ず終わらせる
+    const guard = setTimeout(finish, (total+3)*1000);
   });
   rec.stop();
-  await done;
+  // onstopが来ない場合も5秒で先へ進む(チャンクは揃っている)
+  await Promise.race([done, sleep(5000)]);
   sources.forEach(s=>{ try{s.stop();}catch(_){} });
 
   const blob = new Blob(chunks, {type: mime.split(";")[0] || "video/mp4"});
