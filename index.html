@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>髪ネタ動画メーカー v3</title>
+<title>髪ネタ動画メーカー v5</title>
 <style>
   :root{
     --bg:#1c1a1f; --surface:#27242b; --surface2:#312d36;
@@ -13,7 +13,7 @@
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   body{margin:0; background:var(--bg); color:var(--text);
     font-family:-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
-    padding:16px 14px calc(40px + env(safe-area-inset-bottom));}
+    padding:16px 14px calc(110px + env(safe-area-inset-bottom));}
   h1{font-size:20px; margin:4px 0 2px; letter-spacing:.04em;}
   h1 .dot{color:var(--accent);}
   .tag{font-size:11px; color:var(--sub); margin-bottom:16px;}
@@ -41,24 +41,39 @@
   .imgrow input[type=file]{font-size:12px; color:var(--sub); flex:1;}
   .imgrow .thumb{width:34px; height:34px; border-radius:8px; object-fit:cover; border:1px solid #3d3844; display:none;}
   .imgrow .clear{font-size:11px; color:var(--err); background:none; border:none; padding:6px; width:auto; margin:0; display:none;}
+  .imgrow .ai{font-size:12px; background:var(--surface); color:var(--accent); border:1px solid var(--accent);
+    border-radius:8px; padding:8px 10px; width:auto; margin:0; font-weight:700;}
   .preview-wrap{display:flex; justify-content:center; margin-top:12px;}
   #cv{width:216px; height:384px; border-radius:16px; border:1px solid #3d3844; background:#000;}
   .row{display:flex; gap:8px;}
   .row > *{flex:1;}
   .status{font-size:12px; margin-top:10px; min-height:16px; color:var(--sub); word-break:break-all;}
   .status.ok{color:var(--ok);} .status.err{color:var(--err);}
-  progress{width:100%; height:8px; margin-top:8px; accent-color:var(--accent);}
-  video{width:216px; border-radius:16px; margin-top:12px; display:block; margin-left:auto; margin-right:auto;}
-  a.dl{display:block; text-align:center; margin-top:10px; color:var(--accent); font-weight:700; font-size:15px; text-decoration:none;
-    border:1px solid var(--accent); border-radius:12px; padding:12px;}
   .copybox button{width:auto; padding:8px 14px; font-size:12px; margin-top:8px;}
   .hint{font-size:11px; color:var(--sub); line-height:1.6; margin-top:8px;}
+  /* 製作ライン */
+  #lineStatus{font-size:13px; font-weight:700; margin-bottom:8px;}
+  .job{background:var(--surface2); border:1px solid #3d3844; border-radius:10px; padding:10px; margin-bottom:8px;}
+  .job .jt{font-size:13px; font-weight:700; margin-bottom:2px;}
+  .job .js{font-size:12px; color:var(--sub);}
+  .job .js.ok{color:var(--ok);} .job .js.err{color:var(--err);}
+  .job video{width:130px; border-radius:10px; margin:8px auto 0; display:block;}
+  .job a.dl{display:block; text-align:center; margin-top:8px; color:var(--accent); font-weight:700; font-size:13px;
+    text-decoration:none; border:1px solid var(--accent); border-radius:10px; padding:9px;}
+  .job button.cap{width:100%; padding:9px; font-size:12px; margin-top:6px;}
+  /* 製作中チップ(右下固定) */
+  #chip{position:fixed; right:10px; bottom:calc(10px + env(safe-area-inset-bottom)); z-index:50;
+    background:rgba(32,29,36,.96); border:1px solid var(--accent); border-radius:14px;
+    padding:8px 10px; display:none; align-items:center; gap:10px; box-shadow:0 4px 18px rgba(0,0,0,.5);}
+  #hc{width:36px; height:64px; border-radius:6px; background:#000;}
+  #chipText{font-size:11px; line-height:1.5; max-width:150px;}
+  #chipText b{color:var(--accent); font-size:12px;}
 </style>
 </head>
 <body>
 
-<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v3</small></h1>
-<div class="tag">質問を入れる → 台本を直す → 動画をつくる。以上。</div>
+<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v5</small></h1>
+<div class="tag">質問を入れる → 台本を直す → キューに積んで次へ。</div>
 
 <!-- 設定 -->
 <section>
@@ -112,7 +127,7 @@
   <h2>2. 台本を直す(タップでプレビュー)</h2>
   <div id="slides"></div>
   <div class="preview-wrap"><canvas id="cv" width="720" height="1280"></canvas></div>
-  <div class="hint">背景画像を付けたスライドは、自動で暗めフィルタ+白文字になります(読みやすさ優先)。画像なしなら今まで通りの単色デザインです。</div>
+  <div class="hint">背景画像ありのスライドは黒帯+白文字、なしは単色デザインになります。</div>
 </section>
 
 <!-- キャプション -->
@@ -127,15 +142,28 @@
 <!-- 動画生成 -->
 <section>
   <h2>4. 動画をつくる</h2>
-  <button id="genVideo">ナレーション付き動画を生成</button>
-  <progress id="prog" value="0" max="100" style="display:none"></progress>
+  <button id="genNow">生成して待つ</button>
+  <button id="genNext" class="secondary">キューに追加して次のネタへ</button>
   <div class="status" id="videoStatus"></div>
-  <div id="result"></div>
   <div class="hint">
-    保存方法: 生成後「動画を保存」をタップ → 共有シートで「ビデオを保存」。<br>
+    「キューに追加」を押すと、この台本は裏の製作ラインに送られ、編集欄はリセットされて次のネタをすぐ作れます。<br>
+    製作中はこのSafariの画面を開いたままにしてください(他アプリに切り替えると録画が止まります)。<br>
     BGMは投稿時にTikTokアプリ内でつけてください(流行音源が有利)。
   </div>
 </section>
+
+<!-- 製作ライン -->
+<section>
+  <h2>5. 製作ライン</h2>
+  <div id="lineStatus">製作中 0本 / 待機 0本 / 完成 0本</div>
+  <div id="jobs"><div class="hint">まだ動画がありません。</div></div>
+</section>
+
+<!-- 製作中チップ -->
+<div id="chip">
+  <canvas id="hc" width="720" height="1280"></canvas>
+  <div id="chipText"></div>
+</div>
 
 <script>
 // ============ 状態 ============
@@ -143,7 +171,7 @@ const SLIDE_COUNT = 6;
 const state = {
   slides: Array(SLIDE_COUNT).fill(""),
   narrs:  Array(SLIDE_COUNT).fill(""),
-  imgs:   Array(SLIDE_COUNT).fill(null),  // HTMLImageElement or null
+  imgs:   Array(SLIDE_COUNT).fill(null),
   active: 0,
 };
 
@@ -167,6 +195,7 @@ function buildSlideCards(){
       <textarea data-type="narr" data-i="${i}" placeholder="ナレーション(話し言葉)">${esc(state.narrs[i])}</textarea>
       <div class="imgrow">
         <input type="file" accept="image/*" data-type="img" data-i="${i}">
+        <button class="ai" id="ai${i}" type="button">AI背景</button>
         <img class="thumb" id="thumb${i}">
         <button class="clear" id="clear${i}" type="button">外す</button>
       </div>`;
@@ -180,12 +209,12 @@ function buildSlideCards(){
     document.getElementById("clear"+i).addEventListener("click", ()=>{
       state.imgs[i]=null;
       updateThumb(i);
-      if(i===state.active) drawSlide(ctx,i,0);
+      if(i===state.active) drawPreview(i);
     });
+    document.getElementById("ai"+i).addEventListener("click", ()=>genAiBg(i));
   }
 }
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
-// 「スライド1:」「ポイント②:」などの余計な接頭辞を自動除去
 function stripPrefix(s){
   return (s||"")
     .replace(/^スライド\s*\d+\s*[::]\s*/,"")
@@ -199,7 +228,7 @@ slidesEl.addEventListener("input", (e)=>{
   const i = Number(t.dataset.i);
   if(t.dataset.type==="slide") state.slides[i] = t.value;
   if(t.dataset.type==="narr")  state.narrs[i]  = t.value;
-  if(i===state.active) drawSlide(ctx, i, 0);
+  if(i===state.active) drawPreview(i);
 });
 slidesEl.addEventListener("change", (e)=>{
   const t = e.target;
@@ -225,43 +254,62 @@ function setActive(i, redrawCards=true){
   if(redrawCards){
     document.querySelectorAll(".slide-card").forEach((c,idx)=>c.classList.toggle("active", idx===i));
   }
-  drawSlide(ctx, i, 0);
+  drawPreview(i);
 }
 
-// ============ Canvas 描画 ============
+// AI背景画像を生成してスライドにセット
+async function genAiBg(i){
+  const base = workerBase();
+  if(!base) return;
+  const text = stripPrefix(state.slides[i]||"").trim();
+  if(!text){ alert("先にスライド"+(i+1)+"のテロップを入力してください(それを元に背景を作ります)"); return; }
+  const btn = document.getElementById("ai"+i);
+  const orig = btn.textContent;
+  btn.textContent="生成中..."; btn.disabled=true;
+  try{
+    const res = await fetch(base+"/image", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({text})
+    });
+    if(!res.ok){
+      let msg = "画像生成に失敗しました";
+      try{ const j = await res.json(); if(j.error) msg = j.error + (j.detail?" / "+String(j.detail).slice(0,150):""); }catch(_){}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const img = new Image();
+    img.onload = ()=>{
+      state.imgs[i] = img;
+      updateThumb(i);
+      setActive(i);
+    };
+    img.src = URL.createObjectURL(blob);
+  }catch(e){
+    alert("エラー: "+e.message);
+  }finally{
+    btn.textContent=orig; btn.disabled=false;
+  }
+}
+
+// ============ Canvas 共通描画 ============
 const cv = document.getElementById("cv");
 const ctx = cv.getContext("2d");
+const hc = document.getElementById("hc");        // 録画用(右下チップ内のミニ画面)
+const hctx = hc.getContext("2d");
 const W=720, H=1280;
 
-function theme(){ return THEMES[document.getElementById("theme").value]; }
-function zoomAmount(){ return parseFloat(document.getElementById("zoom").value); }
-
-function wrapText(c, text, maxW){
-  const lines=[]; let line="";
-  for(const ch of text){
-    if(ch==="\n"){ lines.push(line); line=""; continue; }
-    const test = line + ch;
-    if(c.measureText(test).width > maxW && line){ lines.push(line); line=ch; }
-    else line = test;
-  }
-  if(line) lines.push(line);
-  return lines;
-}
-
-// t: 0〜1 (ズーム進行度)
-function drawSlide(c, i, t){
-  const th = theme();
-  const img = state.imgs[i];
+// opt: {text, img, isHook, theme(オブジェクト), badge, zoom}, t: 0〜1
+function renderSlide(c, opt, t){
+  const th = opt.theme;
+  const img = opt.img;
   c.save();
-  const scale = 1 + zoomAmount()*t;
+  const scale = 1 + opt.zoom*t;
   c.translate(W/2, H/2); c.scale(scale, scale); c.translate(-W/2, -H/2);
 
   if(img){
-    // 背景画像をカバー描画
     const s = Math.max(W/img.naturalWidth, H/img.naturalHeight);
     const dw = img.naturalWidth*s, dh = img.naturalHeight*s;
-    c.drawImage(img, (W-dw)/2 - 40*0, (H-dh)/2, dw, dh);
-    // 読みやすさ用フィルタ(上下濃いめのグラデーション)
+    c.drawImage(img, (W-dw)/2, (H-dh)/2, dw, dh);
     const g = c.createLinearGradient(0,0,0,H);
     g.addColorStop(0,"rgba(0,0,0,.55)");
     g.addColorStop(.5,"rgba(0,0,0,.35)");
@@ -272,23 +320,20 @@ function drawSlide(c, i, t){
     c.fillStyle = th.accent; c.fillRect(-40, 0, W+80, 10);
   }
 
-  // 肩書きバッジ
-  const badge = document.getElementById("badge").value || "";
-  if(badge){
+  if(opt.badge){
     c.font = 'bold 30px "Hiragino Sans", sans-serif';
-    const bw = c.measureText(badge).width + 56;
+    const bw = c.measureText(opt.badge).width + 56;
     const bx = (W-bw)/2, by = 90, bh = 62;
     c.fillStyle = th.accent;
     roundRect(c, bx, by, bw, bh, 31); c.fill();
     c.fillStyle = th.badgeText;
     c.textAlign="center"; c.textBaseline="middle";
-    c.fillText(badge, W/2, by+bh/2+2);
+    c.fillText(opt.badge, W/2, by+bh/2+2);
   }
 
-  // 本文(テキストが空なら何も描かない)
-  const text = stripPrefix(state.slides[i] || "");
+  const text = opt.text || "";
   if(text){
-    const isHook = (i===0);
+    const isHook = opt.isHook;
     let size = isHook ? 72 : 58;
     c.textAlign="center"; c.textBaseline="middle";
     let lines;
@@ -304,12 +349,10 @@ function drawSlide(c, i, t){
       const y = startY + idx*lh;
       const tw = c.measureText(ln).width;
       if(isHook){
-        // 掴み: アクセント色の帯 + 高コントラスト文字
         c.fillStyle = th.accent;
         roundRect(c, (W-tw)/2-30, y-size*0.74, tw+60, size*1.48, 16); c.fill();
         c.fillStyle = th.badgeText;
       }else if(img){
-        // 画像の上: 黒帯 + 白文字(確実に読める)
         c.fillStyle = "rgba(0,0,0,.6)";
         roundRect(c, (W-tw)/2-26, y-size*0.72, tw+52, size*1.44, 14); c.fill();
         c.fillStyle = "#ffffff";
@@ -321,14 +364,37 @@ function drawSlide(c, i, t){
   }
   c.restore();
 }
+function wrapText(c, text, maxW){
+  const lines=[]; let line="";
+  for(const ch of text){
+    if(ch==="\n"){ lines.push(line); line=""; continue; }
+    const test = line + ch;
+    if(c.measureText(test).width > maxW && line){ lines.push(line); line=ch; }
+    else line = test;
+  }
+  if(line) lines.push(line);
+  return lines;
+}
 function roundRect(c,x,y,w,h,r){
   c.beginPath();
   c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
   c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
 }
-document.getElementById("theme").addEventListener("change", ()=>drawSlide(ctx, state.active, 0));
-document.getElementById("badge").addEventListener("input", ()=>drawSlide(ctx, state.active, 0));
-document.getElementById("zoom").addEventListener("change", ()=>drawSlide(ctx, state.active, 0));
+
+// 編集画面のプレビュー(現在の入力内容から描画)
+function drawPreview(i){
+  renderSlide(ctx, {
+    text: stripPrefix(state.slides[i]||""),
+    img: state.imgs[i],
+    isHook: i===0,
+    theme: THEMES[document.getElementById("theme").value],
+    badge: document.getElementById("badge").value || "",
+    zoom: parseFloat(document.getElementById("zoom").value),
+  }, 0);
+}
+document.getElementById("theme").addEventListener("change", ()=>drawPreview(state.active));
+document.getElementById("badge").addEventListener("input", ()=>drawPreview(state.active));
+document.getElementById("zoom").addEventListener("change", ()=>drawPreview(state.active));
 
 // ============ 台本生成 ============
 const scriptStatus = document.getElementById("scriptStatus");
@@ -338,7 +404,7 @@ document.getElementById("genScript").addEventListener("click", async ()=>{
   const base = workerBase();
   if(!base) return;
   setStatus(scriptStatus,"台本を生成中...(10秒ほど)","");
-  toggleButtons(true);
+  document.getElementById("genScript").disabled = true;
   try{
     const res = await fetch(base+"/script", {
       method:"POST", headers:{"Content-Type":"application/json"},
@@ -349,6 +415,7 @@ document.getElementById("genScript").addEventListener("click", async ()=>{
     for(let i=0;i<SLIDE_COUNT;i++){
       state.slides[i] = stripPrefix((data.slides && data.slides[i]) || "");
       state.narrs[i]  = stripPrefix((data.narration && data.narration[i]) || "");
+      state.imgs[i]   = state.imgs[i]; // 画像は維持
     }
     document.getElementById("caption").value =
       (data.caption||"") + "\n" + ((data.hashtags||[]).join(" "));
@@ -358,117 +425,283 @@ document.getElementById("genScript").addEventListener("click", async ()=>{
     setStatus(scriptStatus,"台本ができました。自由に直してOK","ok");
   }catch(e){
     setStatus(scriptStatus,"エラー: "+e.message,"err");
-  }finally{ toggleButtons(false); }
+  }finally{ document.getElementById("genScript").disabled = false; }
 });
 
-// ============ 動画生成 ============
+// ============ 製作ライン(キュー) ============
+const line = { queue:[], done:[], running:false, current:null };
 const videoStatus = document.getElementById("videoStatus");
-const prog = document.getElementById("prog");
-const resultEl = document.getElementById("result");
+const jobsEl = document.getElementById("jobs");
+const lineStatusEl = document.getElementById("lineStatus");
+const chip = document.getElementById("chip");
+const chipText = document.getElementById("chipText");
 
-document.getElementById("genVideo").addEventListener("click", async ()=>{
-  const base = workerBase();
-  if(!base) return;
-  const items = [];
-  for(let i=0;i<SLIDE_COUNT;i++){
-    if(state.slides[i].trim()) items.push({i, narr: state.narrs[i].trim()});
-  }
-  if(items.length<2){ setStatus(videoStatus,"スライドが2枚以上必要です","err"); return; }
-
-  toggleButtons(true);
-  resultEl.innerHTML="";
-  prog.style.display="block"; prog.value=0;
-
-  try{
+let audioCtxG = null;
+function getAC(){
+  if(!audioCtxG){
     const AC = window.AudioContext || window.webkitAudioContext;
-    const audioCtx = new AC();
-    await audioCtx.resume();
-
-    // 1) ナレーション音声を順に取得(間に1秒あけて負荷を下げる)
-    const speaker = document.getElementById("speaker").value;
-    for(let k=0;k<items.length;k++){
-      const it = items[k];
-      if(it.narr){
-        setStatus(videoStatus, `ナレーション生成中 ${k+1}/${items.length} ...(混雑時は少し待ちます)`, "");
-        const r = await fetch(base+"/tts?speaker="+speaker+"&text="+encodeURIComponent(it.narr.slice(0,200)));
-        if(!r.ok) throw new Error("TTS失敗(スライド"+(it.i+1)+")。少し時間を置いて再試行してください");
-        const buf = await r.arrayBuffer();
-        it.audio = await audioCtx.decodeAudioData(buf);
-        if(k < items.length-1) await new Promise(r2=>setTimeout(r2,1000));
-      }
-      prog.value = Math.round((k+1)/items.length*50);
-    }
-
-    // 2) タイムライン構築
-    let tcursor = 0.3;
-    for(const it of items){
-      const aDur = it.audio ? it.audio.duration : 0;
-      it.start = tcursor;
-      it.dur = Math.max(2.5, aDur + 0.7);
-      tcursor += it.dur;
-    }
-    const total = tcursor + 0.3;
-
-    // 3) ストリーム準備
-    const dest = audioCtx.createMediaStreamDestination();
-    const stream = new MediaStream([
-      ...cv.captureStream(30).getVideoTracks(),
-      ...dest.stream.getAudioTracks(),
-    ]);
-    let mime = "";
-    for(const m of ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"]){
-      if(MediaRecorder.isTypeSupported(m)){ mime=m; break; }
-    }
-    const rec = new MediaRecorder(stream, mime?{mimeType:mime}:undefined);
-    const chunks=[];
-    rec.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
-    const done = new Promise(res=> rec.onstop = res);
-
-    // 4) 録画
-    setStatus(videoStatus, "動画を録画中...("+Math.ceil(total)+"秒待ってください)", "");
-    rec.start(500);
-    const t0 = audioCtx.currentTime + 0.1;
-    for(const it of items){
-      if(!it.audio) continue;
-      const src = audioCtx.createBufferSource();
-      src.buffer = it.audio;
-      src.connect(dest);
-      src.start(t0 + it.start);
-    }
-    const startMs = performance.now() + 100;
-    await new Promise(resolve=>{
-      function frame(){
-        const el = (performance.now()-startMs)/1000;
-        if(el >= total){ resolve(); return; }
-        let cur = items[0];
-        for(const it of items){ if(el >= it.start) cur = it; }
-        const t = Math.min(1, Math.max(0,(el-cur.start)/cur.dur));
-        drawSlide(ctx, cur.i, t);
-        prog.value = 50 + Math.round(el/total*50);
-        requestAnimationFrame(frame);
-      }
-      requestAnimationFrame(frame);
-    });
-    rec.stop();
-    await done;
-    audioCtx.close();
-
-    // 5) 出力
-    const blob = new Blob(chunks, {type: mime.split(";")[0] || "video/mp4"});
-    const url = URL.createObjectURL(blob);
-    const ext = mime.includes("mp4") ? "mp4":"webm";
-    resultEl.innerHTML = `
-      <video src="${url}" controls playsinline></video>
-      <a class="dl" href="${url}" download="hair_${Date.now()}.${ext}">動画を保存</a>`;
-    prog.value=100;
-    setStatus(videoStatus, "完成!("+ext.toUpperCase()+" / "+(blob.size/1024/1024).toFixed(1)+"MB)", "ok");
-  }catch(e){
-    setStatus(videoStatus, "エラー: "+e.message, "err");
-  }finally{
-    toggleButtons(false);
-    setTimeout(()=>{ prog.style.display="none"; }, 1500);
+    audioCtxG = new AC();
   }
+  return audioCtxG;
+}
+
+// 現在の編集内容からジョブ(製作指示書)を作る
+function makeJob(){
+  const slides=[], narrs=[], imgs=[];
+  for(let i=0;i<SLIDE_COUNT;i++){
+    const t = stripPrefix(state.slides[i]||"").trim();
+    if(t){
+      slides.push(t);
+      narrs.push((state.narrs[i]||"").trim());
+      imgs.push(state.imgs[i]||null);
+    }
+  }
+  if(slides.length<2) return null;
+  return {
+    id: Date.now().toString(36),
+    title: slides[0].slice(0,16) + (slides[0].length>16?"…":""),
+    slides, narrs, imgs,
+    theme: THEMES[document.getElementById("theme").value],
+    badge: document.getElementById("badge").value || "",
+    zoom: parseFloat(document.getElementById("zoom").value),
+    speaker: document.getElementById("speaker").value,
+    caption: document.getElementById("caption").value || "",
+    status:"待機中", detail:"", url:null, ext:null, err:null,
+    prepPromise:null, audios:null,
+  };
+}
+
+function clearForm(){
+  for(let i=0;i<SLIDE_COUNT;i++){
+    state.slides[i]=""; state.narrs[i]=""; state.imgs[i]=null;
+  }
+  document.getElementById("question").value="";
+  document.getElementById("caption").value="";
+  buildSlideCards();
+  for(let i=0;i<SLIDE_COUNT;i++) updateThumb(i);
+  setActive(0);
+}
+
+document.getElementById("genNow").addEventListener("click", ()=>{
+  getAC().resume();
+  const job = makeJob();
+  if(!job){ setStatus(videoStatus,"スライドが2枚以上必要です","err"); return; }
+  line.queue.push(job);
+  setStatus(videoStatus,"製作ラインに送りました。このまま画面を開いて待っていてください","ok");
+  updateLineUI();
+  pump();
 });
+
+document.getElementById("genNext").addEventListener("click", ()=>{
+  getAC().resume();
+  const job = makeJob();
+  if(!job){ setStatus(videoStatus,"スライドが2枚以上必要です","err"); return; }
+  line.queue.push(job);
+  clearForm();
+  setStatus(videoStatus,"キューに追加しました("+job.title+")。次のネタをどうぞ!","ok");
+  updateLineUI();
+  pump();
+  window.scrollTo({top:0, behavior:"smooth"});
+});
+
+// ナレーション音声の準備(先読み対応)
+async function prepareAudio(job){
+  const base = workerBase();
+  if(!base) throw new Error("Worker URL未設定");
+  const ac = getAC();
+  job.audios = [];
+  for(let k=0;k<job.slides.length;k++){
+    const narr = job.narrs[k];
+    if(narr){
+      job.status="音声生成中"; job.detail=`${k+1}/${job.slides.length}`;
+      updateLineUI();
+      const r = await fetch(base+"/tts?speaker="+job.speaker+"&text="+encodeURIComponent(narr.slice(0,200)));
+      if(!r.ok) throw new Error("音声生成に失敗(スライド"+(k+1)+")");
+      const buf = await r.arrayBuffer();
+      job.audios[k] = await ac.decodeAudioData(buf);
+      if(k < job.slides.length-1) await sleep(1000);
+    }else{
+      job.audios[k] = null;
+    }
+  }
+  job.status="録画待ち"; job.detail="";
+  updateLineUI();
+}
+
+// 録画(1本ずつ・右下ミニ画面に描画)
+async function recordJob(job){
+  const ac = getAC();
+  // タイムライン
+  let tcursor = 0.3;
+  const items = job.slides.map((s,k)=>{
+    const aDur = job.audios[k] ? job.audios[k].duration : 0;
+    const it = { idx:k, start:tcursor, dur:Math.max(2.5, aDur+0.7) };
+    tcursor += it.dur;
+    return it;
+  });
+  const total = tcursor + 0.3;
+
+  const dest = ac.createMediaStreamDestination();
+  const stream = new MediaStream([
+    ...hc.captureStream(30).getVideoTracks(),
+    ...dest.stream.getAudioTracks(),
+  ]);
+  let mime = "";
+  for(const m of ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"]){
+    if(MediaRecorder.isTypeSupported(m)){ mime=m; break; }
+  }
+  const rec = new MediaRecorder(stream, mime?{mimeType:mime}:undefined);
+  const chunks=[];
+  rec.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
+  const done = new Promise(res=> rec.onstop = res);
+
+  job.status="録画中"; updateLineUI();
+  rec.start(500);
+  const t0 = ac.currentTime + 0.1;
+  const sources = [];
+  for(const it of items){
+    const buf = job.audios[it.idx];
+    if(!buf) continue;
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.connect(dest);
+    src.start(t0 + it.start);
+    sources.push(src);
+  }
+  const startMs = performance.now() + 100;
+  await new Promise(resolve=>{
+    function frame(){
+      const el = (performance.now()-startMs)/1000;
+      if(el >= total){ resolve(); return; }
+      let cur = items[0];
+      for(const it of items){ if(el >= it.start) cur = it; }
+      const t = Math.min(1, Math.max(0,(el-cur.start)/cur.dur));
+      renderSlide(hctx, {
+        text: job.slides[cur.idx],
+        img: job.imgs[cur.idx],
+        isHook: cur.idx===0,
+        theme: job.theme,
+        badge: job.badge,
+        zoom: job.zoom,
+      }, t);
+      job.detail = "残り"+Math.max(0,Math.ceil(total-el))+"秒";
+      updateChip();
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  });
+  rec.stop();
+  await done;
+  sources.forEach(s=>{ try{s.stop();}catch(_){} });
+
+  const blob = new Blob(chunks, {type: mime.split(";")[0] || "video/mp4"});
+  job.url = URL.createObjectURL(blob);
+  job.ext = mime.includes("mp4") ? "mp4":"webm";
+  job.size = (blob.size/1024/1024).toFixed(1);
+  job.detail = "";
+}
+
+// 製作ラインを回す(録画は1本ずつ / 次のジョブの音声は録画中に先読み)
+async function pump(){
+  if(line.running) return;
+  line.running = true;
+  updateLineUI();
+  while(line.queue.length){
+    const job = line.queue[0];
+    line.current = job;
+    try{
+      if(job.status==="失敗") throw new Error(job.err||"音声準備に失敗");
+      if(!job.prepPromise) job.prepPromise = prepareAudio(job);
+      await job.prepPromise;
+      if(job.status==="失敗") throw new Error(job.err||"音声準備に失敗");
+      // 次のジョブの音声を録画中に先読み
+      const nxt = line.queue[1];
+      if(nxt && !nxt.prepPromise){
+        nxt.prepPromise = prepareAudio(nxt).catch(e=>{
+          nxt.status="失敗"; nxt.err = e.message||String(e);
+        });
+      }
+      await recordJob(job);
+      job.status="完成";
+    }catch(e){
+      job.status="失敗";
+      job.err = e.message || String(e);
+    }
+    line.queue.shift();
+    line.done.unshift(job);
+    line.current = null;
+    updateLineUI();
+  }
+  line.running = false;
+  updateLineUI();
+}
+
+// ============ 製作ライン表示 ============
+function updateLineUI(){
+  const making = line.current ? 1 : 0;
+  const waiting = line.queue.length - making;
+  const finished = line.done.filter(j=>j.status==="完成").length;
+  lineStatusEl.textContent = `製作中 ${making}本 / 待機 ${Math.max(0,waiting)}本 / 完成 ${finished}本`;
+
+  const rows = [];
+  for(const j of line.queue){
+    rows.push(jobRow(j));
+  }
+  for(const j of line.done){
+    rows.push(jobRow(j));
+  }
+  jobsEl.innerHTML = rows.length ? rows.join("") : '<div class="hint">まだ動画がありません。</div>';
+
+  // 完成ジョブの保存ボタン等にイベント付与
+  for(const j of line.done){
+    const capBtn = document.getElementById("cap-"+j.id);
+    if(capBtn && !capBtn.dataset.bound){
+      capBtn.dataset.bound = "1";
+      capBtn.addEventListener("click", async ()=>{
+        try{ await navigator.clipboard.writeText(j.caption||""); capBtn.textContent="コピーしました!";
+          setTimeout(()=>capBtn.textContent="キャプションをコピー",1500);
+        }catch(e){ alert("コピーできませんでした"); }
+      });
+    }
+  }
+  updateChip();
+}
+
+function jobRow(j){
+  let statusCls = "";
+  if(j.status==="完成") statusCls="ok";
+  if(j.status==="失敗") statusCls="err";
+  let body = "";
+  if(j.status==="完成" && j.url){
+    body = `
+      <video src="${j.url}" controls playsinline></video>
+      <a class="dl" href="${j.url}" download="hair_${j.id}.${j.ext}">動画を保存 (${j.size}MB)</a>
+      ${j.caption ? `<button class="secondary cap" id="cap-${j.id}">キャプションをコピー</button>`:""}`;
+  }
+  if(j.status==="失敗"){
+    body = `<div class="js err">エラー: ${esc(j.err||"")}</div>`;
+  }
+  return `
+    <div class="job">
+      <div class="jt">${esc(j.title)}</div>
+      <div class="js ${statusCls}">${j.status}${j.detail?" "+esc(j.detail):""}</div>
+      ${body}
+    </div>`;
+}
+
+function updateChip(){
+  const making = line.current;
+  if(making){
+    chip.style.display = "flex";
+    const waiting = line.queue.length - 1;
+    chipText.innerHTML = `<b>製作中</b> ${esc(making.title)}<br>${esc(making.status)} ${esc(making.detail||"")}${waiting>0 ? "<br>待機 "+waiting+"本":""}`;
+  }else if(line.queue.length){
+    chip.style.display = "flex";
+    chipText.innerHTML = `待機 ${line.queue.length}本`;
+  }else{
+    chip.style.display = "none";
+  }
+}
 
 // ============ 共通 ============
 function workerBase(){
@@ -477,10 +710,8 @@ function workerBase(){
   return u.replace(/\/+$/,"");
 }
 function setStatus(el,msg,cls){ el.textContent=msg; el.className="status "+(cls||""); }
-function toggleButtons(dis){
-  document.getElementById("genScript").disabled=dis;
-  document.getElementById("genVideo").disabled=dis;
-}
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
 document.getElementById("copyCap").addEventListener("click", async ()=>{
   const t = document.getElementById("caption").value;
   try{ await navigator.clipboard.writeText(t);
@@ -491,7 +722,7 @@ document.getElementById("copyCap").addEventListener("click", async ()=>{
 
 // 初期化
 buildSlideCards();
-drawSlide(ctx, 0, 0);
+drawPreview(0);
 </script>
 </body>
 </html>
