@@ -4,7 +4,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>髪ネタ動画メーカー v5.1</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="髪ネタ">
+<meta name="theme-color" content="#1c1a1f">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<title>髪ネタ動画メーカー v5.2</title>
 <style>
   :root{
     --bg:#1c1a1f; --surface:#27242b; --surface2:#312d36;
@@ -73,7 +80,7 @@
 </head>
 <body>
 
-<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v5.1</small></h1>
+<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v5.2</small></h1>
 <div class="tag">質問を入れる → 台本を直す → キューに積んで次へ。</div>
 
 <!-- 設定 -->
@@ -158,6 +165,14 @@
   <h2>5. 製作ライン</h2>
   <div id="lineStatus">製作中 0本 / 待機 0本 / 完成 0本</div>
   <div id="jobs"><div class="hint">まだ動画がありません。</div></div>
+</section>
+
+<!-- キャプション履歴 -->
+<section>
+  <h2>6. キャプション履歴(端末に保存)</h2>
+  <div id="history"></div>
+  <button id="clearHist" class="secondary">履歴を全部消す</button>
+  <div class="hint">キューに追加した動画のタイトルとキャプションが自動で残ります(最新50件)。タブを閉じても消えません。</div>
 </section>
 
 <!-- 製作中チップ -->
@@ -481,6 +496,7 @@ function clearForm(){
   buildSlideCards();
   for(let i=0;i<SLIDE_COUNT;i++) updateThumb(i);
   setActive(0);
+  saveDraft();
 }
 
 document.getElementById("genNow").addEventListener("click", ()=>{
@@ -488,6 +504,7 @@ document.getElementById("genNow").addEventListener("click", ()=>{
   const job = makeJob();
   if(!job){ setStatus(videoStatus,"スライドが2枚以上必要です","err"); return; }
   line.queue.push(job);
+  pushHistory(job);
   setStatus(videoStatus,"製作ラインに送りました。このまま画面を開いて待っていてください","ok");
   updateLineUI();
   pump();
@@ -498,6 +515,7 @@ document.getElementById("genNext").addEventListener("click", ()=>{
   const job = makeJob();
   if(!job){ setStatus(videoStatus,"スライドが2枚以上必要です","err"); return; }
   line.queue.push(job);
+  pushHistory(job);
   clearForm();
   setStatus(videoStatus,"キューに追加しました("+job.title+")。次のネタをどうぞ!","ok");
   updateLineUI();
@@ -610,6 +628,7 @@ async function recordJob(job){
   sources.forEach(s=>{ try{s.stop();}catch(_){} });
 
   const blob = new Blob(chunks, {type: mime.split(";")[0] || "video/mp4"});
+  job.blob = blob;
   job.url = URL.createObjectURL(blob);
   job.ext = mime.includes("mp4") ? "mp4":"webm";
   job.size = (blob.size/1024/1024).toFixed(1);
@@ -678,8 +697,30 @@ function updateLineUI(){
         }catch(e){ alert("コピーできませんでした"); }
       });
     }
+    const saveBtn = document.getElementById("save-"+j.id);
+    if(saveBtn && !saveBtn.dataset.bound){
+      saveBtn.dataset.bound = "1";
+      saveBtn.addEventListener("click", (e)=>{ e.preventDefault(); shareJob(j); });
+    }
   }
   updateChip();
+}
+
+// 動画の保存: 共有シート(アプリモードでも確実)→ダメならダウンロード
+async function shareJob(j){
+  if(!j.blob) return;
+  const file = new File([j.blob], "hair_"+j.id+"."+j.ext, {type: j.blob.type});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file]});
+      return;
+    }catch(e){
+      if(e && e.name==="AbortError") return; // ユーザーがキャンセル
+    }
+  }
+  const a = document.createElement("a");
+  a.href = j.url; a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
 }
 
 function jobRow(j){
@@ -690,7 +731,7 @@ function jobRow(j){
   if(j.status==="完成" && j.url){
     body = `
       <video src="${j.url}" controls playsinline></video>
-      <a class="dl" href="${j.url}" download="hair_${j.id}.${j.ext}">動画を保存 (${j.size}MB)</a>
+      <a class="dl" href="#" id="save-${j.id}">動画を保存 (${j.size}MB)</a>
       ${j.caption ? `<button class="secondary cap" id="cap-${j.id}">キャプションをコピー</button>`:""}`;
   }
   if(j.status==="失敗"){
@@ -735,9 +776,91 @@ document.getElementById("copyCap").addEventListener("click", async ()=>{
   }catch(e){ alert("コピーできませんでした。手動で選択してください"); }
 });
 
+// ============ 下書き自動保存・キャプション履歴(端末内保存) ============
+const DRAFT_KEY = "hairtool_draft_v1";
+const HIST_KEY  = "hairtool_history_v1";
+let saveTimer = null;
+function saveDraftDebounced(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveDraft, 400); }
+function saveDraft(){
+  try{
+    const d = {
+      question: document.getElementById("question").value,
+      caption:  document.getElementById("caption").value,
+      slides: state.slides, narrs: state.narrs,
+      workerUrl: document.getElementById("workerUrl").value,
+      theme: document.getElementById("theme").value,
+      speaker: document.getElementById("speaker").value,
+      zoom: document.getElementById("zoom").value,
+      badge: document.getElementById("badge").value,
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+  }catch(e){}
+}
+function loadDraft(){
+  try{
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    if(d.question!=null) document.getElementById("question").value = d.question;
+    if(d.caption!=null)  document.getElementById("caption").value  = d.caption;
+    if(Array.isArray(d.slides)) for(let i=0;i<SLIDE_COUNT;i++) state.slides[i]=d.slides[i]||"";
+    if(Array.isArray(d.narrs))  for(let i=0;i<SLIDE_COUNT;i++) state.narrs[i]=d.narrs[i]||"";
+    if(d.workerUrl) document.getElementById("workerUrl").value = d.workerUrl;
+    if(d.theme)   document.getElementById("theme").value   = d.theme;
+    if(d.speaker) document.getElementById("speaker").value = d.speaker;
+    if(d.zoom!=null)  document.getElementById("zoom").value  = d.zoom;
+    if(d.badge!=null) document.getElementById("badge").value = d.badge;
+  }catch(e){}
+}
+function getHistory(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY)||"[]"); }catch(e){ return []; } }
+function pushHistory(job){
+  try{
+    const h = getHistory();
+    h.unshift({ t: job.title, c: job.caption||"", d: new Date().toLocaleString("ja-JP") });
+    localStorage.setItem(HIST_KEY, JSON.stringify(h.slice(0,50)));
+  }catch(e){}
+  renderHistory();
+}
+function renderHistory(){
+  const el = document.getElementById("history");
+  const h = getHistory();
+  if(!h.length){
+    el.innerHTML = '<div class="hint">まだ履歴がありません。キューに追加すると自動で残ります。</div>';
+    return;
+  }
+  el.innerHTML = h.map((x,i)=>`
+    <div class="job">
+      <div class="jt">${esc(x.t)}</div>
+      <div class="js">${esc(x.d)}</div>
+      ${x.c ? `<div class="js" style="margin-top:4px; white-space:pre-wrap">${esc(x.c)}</div>
+      <button class="secondary cap" data-hist="${i}">キャプションをコピー</button>` : ""}
+    </div>`).join("");
+  el.querySelectorAll("[data-hist]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const x = getHistory()[Number(btn.dataset.hist)];
+      if(!x) return;
+      try{ await navigator.clipboard.writeText(x.c); btn.textContent="コピーしました!";
+        setTimeout(()=>btn.textContent="キャプションをコピー",1500);
+      }catch(e){ alert("コピーできませんでした"); }
+    });
+  });
+}
+document.getElementById("clearHist").addEventListener("click", ()=>{
+  if(confirm("キャプション履歴を全部消しますか?")){
+    try{ localStorage.removeItem(HIST_KEY); }catch(e){}
+    renderHistory();
+  }
+});
+// 入力・変更のたびに下書きを自動保存
+document.addEventListener("input", saveDraftDebounced);
+document.addEventListener("change", saveDraftDebounced);
+
 // 初期化
+loadDraft();
 buildSlideCards();
+for(let i=0;i<SLIDE_COUNT;i++) updateThumb(i);
 drawPreview(0);
+renderHistory();
 </script>
 </body>
 </html>
