@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>髪ネタ動画メーカー</title>
+<title>髪ネタ動画メーカー v2</title>
 <style>
   :root{
     --bg:#1c1a1f; --surface:#27242b; --surface2:#312d36;
@@ -37,6 +37,10 @@
   .slide-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
   .slide-head b{font-size:12px; color:var(--accent);}
   .slide-head span{font-size:11px; color:var(--sub);}
+  .imgrow{display:flex; align-items:center; gap:8px; margin-top:6px;}
+  .imgrow input[type=file]{font-size:12px; color:var(--sub); flex:1;}
+  .imgrow .thumb{width:34px; height:34px; border-radius:8px; object-fit:cover; border:1px solid #3d3844; display:none;}
+  .imgrow .clear{font-size:11px; color:var(--err); background:none; border:none; padding:6px; width:auto; margin:0; display:none;}
   .preview-wrap{display:flex; justify-content:center; margin-top:12px;}
   #cv{width:216px; height:384px; border-radius:16px; border:1px solid #3d3844; background:#000;}
   .row{display:flex; gap:8px;}
@@ -47,14 +51,13 @@
   video{width:216px; border-radius:16px; margin-top:12px; display:block; margin-left:auto; margin-right:auto;}
   a.dl{display:block; text-align:center; margin-top:10px; color:var(--accent); font-weight:700; font-size:15px; text-decoration:none;
     border:1px solid var(--accent); border-radius:12px; padding:12px;}
-  .copybox{position:relative;}
   .copybox button{width:auto; padding:8px 14px; font-size:12px; margin-top:8px;}
   .hint{font-size:11px; color:var(--sub); line-height:1.6; margin-top:8px;}
 </style>
 </head>
 <body>
 
-<h1>髪ネタ動画メーカー<span class="dot">.</span></h1>
+<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v2</small></h1>
 <div class="tag">質問を入れる → 台本を直す → 動画をつくる。以上。</div>
 
 <!-- 設定 -->
@@ -80,8 +83,19 @@
       </select>
     </div>
   </div>
-  <label>肩書き(全スライド上部に固定表示)</label>
-  <input type="text" id="badge" value="現役美容師の髪ネタ">
+  <div class="row">
+    <div>
+      <label>ズームの動き</label>
+      <select id="zoom">
+        <option value="0.02" selected>ひかえめ</option>
+        <option value="0">なし</option>
+      </select>
+    </div>
+    <div>
+      <label>肩書き(固定表示)</label>
+      <input type="text" id="badge" value="現役美容師の髪ネタ">
+    </div>
+  </div>
 </section>
 
 <!-- 台本生成 -->
@@ -98,6 +112,7 @@
   <h2>2. 台本を直す(タップでプレビュー)</h2>
   <div id="slides"></div>
   <div class="preview-wrap"><canvas id="cv" width="720" height="1280"></canvas></div>
+  <div class="hint">背景画像を付けたスライドは、自動で暗めフィルタ+白文字になります(読みやすさ優先)。画像なしなら今まで通りの単色デザインです。</div>
 </section>
 
 <!-- キャプション -->
@@ -117,7 +132,7 @@
   <div class="status" id="videoStatus"></div>
   <div id="result"></div>
   <div class="hint">
-    保存方法: 生成後「動画を保存」をタップ → 共有シートで「ビデオを保存」を選ぶとカメラロールに入ります。<br>
+    保存方法: 生成後「動画を保存」をタップ → 共有シートで「ビデオを保存」。<br>
     BGMは投稿時にTikTokアプリ内でつけてください(流行音源が有利)。
   </div>
 </section>
@@ -128,6 +143,7 @@ const SLIDE_COUNT = 6;
 const state = {
   slides: Array(SLIDE_COUNT).fill(""),
   narrs:  Array(SLIDE_COUNT).fill(""),
+  imgs:   Array(SLIDE_COUNT).fill(null),  // HTMLImageElement or null
   active: 0,
 };
 
@@ -148,12 +164,28 @@ function buildSlideCards(){
     card.innerHTML = `
       <div class="slide-head"><b>スライド${i+1} / ${NAMES[i]}</b><span>タップでプレビュー</span></div>
       <textarea data-type="slide" data-i="${i}" placeholder="テロップ(短く)">${esc(state.slides[i])}</textarea>
-      <textarea data-type="narr" data-i="${i}" placeholder="ナレーション(話し言葉)">${esc(state.narrs[i])}</textarea>`;
-    card.addEventListener("click", ()=>{ setActive(i); });
+      <textarea data-type="narr" data-i="${i}" placeholder="ナレーション(話し言葉)">${esc(state.narrs[i])}</textarea>
+      <div class="imgrow">
+        <input type="file" accept="image/*" data-type="img" data-i="${i}">
+        <img class="thumb" id="thumb${i}">
+        <button class="clear" id="clear${i}" type="button">外す</button>
+      </div>`;
+    card.addEventListener("click", (e)=>{
+      if(e.target.tagName==="TEXTAREA"||e.target.tagName==="INPUT"||e.target.tagName==="BUTTON") {
+        setActive(i, false); return;
+      }
+      setActive(i);
+    });
     slidesEl.appendChild(card);
+    document.getElementById("clear"+i).addEventListener("click", ()=>{
+      state.imgs[i]=null;
+      updateThumb(i);
+      if(i===state.active) drawSlide(ctx,i,0);
+    });
   }
 }
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+
 slidesEl.addEventListener("input", (e)=>{
   const t = e.target;
   if(!t.dataset) return;
@@ -162,9 +194,30 @@ slidesEl.addEventListener("input", (e)=>{
   if(t.dataset.type==="narr")  state.narrs[i]  = t.value;
   if(i===state.active) drawSlide(ctx, i, 0);
 });
-function setActive(i){
+slidesEl.addEventListener("change", (e)=>{
+  const t = e.target;
+  if(t.dataset && t.dataset.type==="img" && t.files && t.files[0]){
+    const i = Number(t.dataset.i);
+    const img = new Image();
+    img.onload = ()=>{
+      state.imgs[i] = img;
+      updateThumb(i);
+      setActive(i);
+    };
+    img.src = URL.createObjectURL(t.files[0]);
+  }
+});
+function updateThumb(i){
+  const th = document.getElementById("thumb"+i);
+  const cl = document.getElementById("clear"+i);
+  if(state.imgs[i]){ th.src = state.imgs[i].src; th.style.display="block"; cl.style.display="block"; }
+  else{ th.style.display="none"; cl.style.display="none"; }
+}
+function setActive(i, redrawCards=true){
   state.active = i;
-  document.querySelectorAll(".slide-card").forEach((c,idx)=>c.classList.toggle("active", idx===i));
+  if(redrawCards){
+    document.querySelectorAll(".slide-card").forEach((c,idx)=>c.classList.toggle("active", idx===i));
+  }
   drawSlide(ctx, i, 0);
 }
 
@@ -174,6 +227,7 @@ const ctx = cv.getContext("2d");
 const W=720, H=1280;
 
 function theme(){ return THEMES[document.getElementById("theme").value]; }
+function zoomAmount(){ return parseFloat(document.getElementById("zoom").value); }
 
 function wrapText(c, text, maxW){
   const lines=[]; let line="";
@@ -190,16 +244,26 @@ function wrapText(c, text, maxW){
 // t: 0〜1 (ズーム進行度)
 function drawSlide(c, i, t){
   const th = theme();
+  const img = state.imgs[i];
   c.save();
-  // Ken Burns: 全体を少しずつ拡大
-  const scale = 1 + 0.06*t;
+  const scale = 1 + zoomAmount()*t;
   c.translate(W/2, H/2); c.scale(scale, scale); c.translate(-W/2, -H/2);
 
-  // 背景
-  c.fillStyle = th.bg; c.fillRect(-40,-40,W+80,H+80);
-
-  // 上部の細いアクセントライン
-  c.fillStyle = th.accent; c.fillRect(-40, 0, W+80, 10);
+  if(img){
+    // 背景画像をカバー描画
+    const s = Math.max(W/img.naturalWidth, H/img.naturalHeight);
+    const dw = img.naturalWidth*s, dh = img.naturalHeight*s;
+    c.drawImage(img, (W-dw)/2 - 40*0, (H-dh)/2, dw, dh);
+    // 読みやすさ用フィルタ(上下濃いめのグラデーション)
+    const g = c.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"rgba(0,0,0,.55)");
+    g.addColorStop(.5,"rgba(0,0,0,.35)");
+    g.addColorStop(1,"rgba(0,0,0,.55)");
+    c.fillStyle = g; c.fillRect(-40,-40,W+80,H+80);
+  }else{
+    c.fillStyle = th.bg; c.fillRect(-40,-40,W+80,H+80);
+    c.fillStyle = th.accent; c.fillRect(-40, 0, W+80, 10);
+  }
 
   // 肩書きバッジ
   const badge = document.getElementById("badge").value || "";
@@ -228,15 +292,23 @@ function drawSlide(c, i, t){
   }
   const lh = size*1.5;
   const startY = H/2 - (lines.length-1)*lh/2;
-  c.fillStyle = isHook ? th.accent : th.text;
+  if(img){
+    // 画像の上は白文字+影で読みやすく
+    c.shadowColor="rgba(0,0,0,.8)"; c.shadowBlur=14; c.shadowOffsetY=3;
+    c.fillStyle = isHook ? "#ffd6e2" : "#ffffff";
+  }else{
+    c.fillStyle = isHook ? th.accent : th.text;
+  }
   lines.forEach((ln,idx)=> c.fillText(ln, W/2, startY + idx*lh));
+  c.shadowColor="transparent"; c.shadowBlur=0; c.shadowOffsetY=0;
 
   // ページドット
   const dotY = H-110;
   for(let d=0; d<SLIDE_COUNT; d++){
     c.beginPath();
     c.arc(W/2 + (d-(SLIDE_COUNT-1)/2)*34, dotY, d===i?9:6, 0, Math.PI*2);
-    c.fillStyle = d===i ? th.accent : th.text+"55";
+    const base = img ? "#ffffff" : th.text;
+    c.fillStyle = d===i ? (img ? "#ffffff" : th.accent) : base+"55";
     c.fill();
   }
   c.restore();
@@ -248,6 +320,7 @@ function roundRect(c,x,y,w,h,r){
 }
 document.getElementById("theme").addEventListener("change", ()=>drawSlide(ctx, state.active, 0));
 document.getElementById("badge").addEventListener("input", ()=>drawSlide(ctx, state.active, 0));
+document.getElementById("zoom").addEventListener("change", ()=>drawSlide(ctx, state.active, 0));
 
 // ============ 台本生成 ============
 const scriptStatus = document.getElementById("scriptStatus");
@@ -272,6 +345,7 @@ document.getElementById("genScript").addEventListener("click", async ()=>{
     document.getElementById("caption").value =
       (data.caption||"") + "\n" + ((data.hashtags||[]).join(" "));
     buildSlideCards();
+    for(let i=0;i<SLIDE_COUNT;i++) updateThumb(i);
     setActive(0);
     setStatus(scriptStatus,"台本ができました。自由に直してOK","ok");
   }catch(e){
@@ -287,7 +361,6 @@ const resultEl = document.getElementById("result");
 document.getElementById("genVideo").addEventListener("click", async ()=>{
   const base = workerBase();
   if(!base) return;
-  // 使用するスライド(テロップが空でないもの)
   const items = [];
   for(let i=0;i<SLIDE_COUNT;i++){
     if(state.slides[i].trim()) items.push({i, narr: state.narrs[i].trim()});
@@ -303,16 +376,17 @@ document.getElementById("genVideo").addEventListener("click", async ()=>{
     const audioCtx = new AC();
     await audioCtx.resume();
 
-    // 1) ナレーション音声を順に取得
+    // 1) ナレーション音声を順に取得(間に1秒あけて負荷を下げる)
     const speaker = document.getElementById("speaker").value;
     for(let k=0;k<items.length;k++){
       const it = items[k];
       if(it.narr){
-        setStatus(videoStatus, `ナレーション生成中 ${k+1}/${items.length} ...`, "");
+        setStatus(videoStatus, `ナレーション生成中 ${k+1}/${items.length} ...(混雑時は少し待ちます)`, "");
         const r = await fetch(base+"/tts?speaker="+speaker+"&text="+encodeURIComponent(it.narr.slice(0,200)));
-        if(!r.ok) throw new Error("TTS失敗(スライド"+(it.i+1)+")");
+        if(!r.ok) throw new Error("TTS失敗(スライド"+(it.i+1)+")。少し時間を置いて再試行してください");
         const buf = await r.arrayBuffer();
         it.audio = await audioCtx.decodeAudioData(buf);
+        if(k < items.length-1) await new Promise(r2=>setTimeout(r2,1000));
       }
       prog.value = Math.round((k+1)/items.length*50);
     }
@@ -327,7 +401,7 @@ document.getElementById("genVideo").addEventListener("click", async ()=>{
     }
     const total = tcursor + 0.3;
 
-    // 3) ストリーム準備(映像=canvas / 音声=WebAudio)
+    // 3) ストリーム準備
     const dest = audioCtx.createMediaStreamDestination();
     const stream = new MediaStream([
       ...cv.captureStream(30).getVideoTracks(),
@@ -342,7 +416,7 @@ document.getElementById("genVideo").addEventListener("click", async ()=>{
     rec.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
     const done = new Promise(res=> rec.onstop = res);
 
-    // 4) 録画開始 + 音声スケジュール + 描画ループ
+    // 4) 録画
     setStatus(videoStatus, "動画を録画中...("+Math.ceil(total)+"秒待ってください)", "");
     rec.start(500);
     const t0 = audioCtx.currentTime + 0.1;
@@ -401,7 +475,7 @@ function toggleButtons(dis){
 }
 document.getElementById("copyCap").addEventListener("click", async ()=>{
   const t = document.getElementById("caption").value;
-  try{ await navigator.clipboard.writeText(t); setStatus(scriptStatus,"","");
+  try{ await navigator.clipboard.writeText(t);
     document.getElementById("copyCap").textContent="コピーしました!";
     setTimeout(()=>document.getElementById("copyCap").textContent="キャプションをコピー",1500);
   }catch(e){ alert("コピーできませんでした。手動で選択してください"); }
