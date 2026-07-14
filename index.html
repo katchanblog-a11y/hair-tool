@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>髪ネタ動画メーカー v2</title>
+<title>髪ネタ動画メーカー v3</title>
 <style>
   :root{
     --bg:#1c1a1f; --surface:#27242b; --surface2:#312d36;
@@ -57,7 +57,7 @@
 </head>
 <body>
 
-<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v2</small></h1>
+<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v3</small></h1>
 <div class="tag">質問を入れる → 台本を直す → 動画をつくる。以上。</div>
 
 <!-- 設定 -->
@@ -185,6 +185,13 @@ function buildSlideCards(){
   }
 }
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+// 「スライド1:」「ポイント②:」などの余計な接頭辞を自動除去
+function stripPrefix(s){
+  return (s||"")
+    .replace(/^スライド\s*\d+\s*[::]\s*/,"")
+    .replace(/^(掴み|共感|ポイント[①②③123]?|誘導)\s*[::]\s*/,"")
+    .trim();
+}
 
 slidesEl.addEventListener("input", (e)=>{
   const t = e.target;
@@ -278,38 +285,39 @@ function drawSlide(c, i, t){
     c.fillText(badge, W/2, by+bh/2+2);
   }
 
-  // 本文
-  const text = state.slides[i] || "(スライド"+(i+1)+")";
-  const isHook = (i===0);
-  let size = isHook ? 76 : 60;
-  c.textAlign="center"; c.textBaseline="middle";
-  let lines;
-  while(true){
-    c.font = `bold ${size}px "Hiragino Sans", sans-serif`;
-    lines = wrapText(c, text, W-140);
-    if(lines.length*size*1.5 < H*0.5 || size<=40) break;
-    size -= 4;
-  }
-  const lh = size*1.5;
-  const startY = H/2 - (lines.length-1)*lh/2;
-  if(img){
-    // 画像の上は白文字+影で読みやすく
-    c.shadowColor="rgba(0,0,0,.8)"; c.shadowBlur=14; c.shadowOffsetY=3;
-    c.fillStyle = isHook ? "#ffd6e2" : "#ffffff";
-  }else{
-    c.fillStyle = isHook ? th.accent : th.text;
-  }
-  lines.forEach((ln,idx)=> c.fillText(ln, W/2, startY + idx*lh));
-  c.shadowColor="transparent"; c.shadowBlur=0; c.shadowOffsetY=0;
-
-  // ページドット
-  const dotY = H-110;
-  for(let d=0; d<SLIDE_COUNT; d++){
-    c.beginPath();
-    c.arc(W/2 + (d-(SLIDE_COUNT-1)/2)*34, dotY, d===i?9:6, 0, Math.PI*2);
-    const base = img ? "#ffffff" : th.text;
-    c.fillStyle = d===i ? (img ? "#ffffff" : th.accent) : base+"55";
-    c.fill();
+  // 本文(テキストが空なら何も描かない)
+  const text = stripPrefix(state.slides[i] || "");
+  if(text){
+    const isHook = (i===0);
+    let size = isHook ? 72 : 58;
+    c.textAlign="center"; c.textBaseline="middle";
+    let lines;
+    while(true){
+      c.font = `bold ${size}px "Hiragino Sans", sans-serif`;
+      lines = wrapText(c, text, W-170);
+      if(lines.length*size*1.7 < H*0.52 || size<=40) break;
+      size -= 4;
+    }
+    const lh = size*1.7;
+    const startY = H/2 - (lines.length-1)*lh/2;
+    lines.forEach((ln,idx)=>{
+      const y = startY + idx*lh;
+      const tw = c.measureText(ln).width;
+      if(isHook){
+        // 掴み: アクセント色の帯 + 高コントラスト文字
+        c.fillStyle = th.accent;
+        roundRect(c, (W-tw)/2-30, y-size*0.74, tw+60, size*1.48, 16); c.fill();
+        c.fillStyle = th.badgeText;
+      }else if(img){
+        // 画像の上: 黒帯 + 白文字(確実に読める)
+        c.fillStyle = "rgba(0,0,0,.6)";
+        roundRect(c, (W-tw)/2-26, y-size*0.72, tw+52, size*1.44, 14); c.fill();
+        c.fillStyle = "#ffffff";
+      }else{
+        c.fillStyle = th.text;
+      }
+      c.fillText(ln, W/2, y+2);
+    });
   }
   c.restore();
 }
@@ -339,8 +347,8 @@ document.getElementById("genScript").addEventListener("click", async ()=>{
     const data = await res.json();
     if(data.error) throw new Error(data.error + (data.detail?" / "+JSON.stringify(data.detail).slice(0,120):""));
     for(let i=0;i<SLIDE_COUNT;i++){
-      state.slides[i] = (data.slides && data.slides[i]) || "";
-      state.narrs[i]  = (data.narration && data.narration[i]) || "";
+      state.slides[i] = stripPrefix((data.slides && data.slides[i]) || "");
+      state.narrs[i]  = stripPrefix((data.narration && data.narration[i]) || "");
     }
     document.getElementById("caption").value =
       (data.caption||"") + "\n" + ((data.hashtags||[]).join(" "));
