@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1c1a1f">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<title>髪ネタ動画メーカー v6</title>
+<title>髪ネタ動画メーカー v6.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -149,6 +149,57 @@
   @keyframes pulse{0%,100%{opacity:1; transform:scale(1);} 50%{opacity:.35; transform:scale(.8);}}
   #chipText{font-size:11px; line-height:1.55; max-width:175px;}
   #chipText b{color:var(--accent); font-size:12px;}
+
+  /* ===== モーション演出 ===== */
+  /* 起動時: セクションが順にふわっと出現 */
+  @keyframes fadeUp{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;}}
+  header{animation:fadeUp .55s ease both;}
+  section{animation:fadeUp .55s ease both;}
+  section:nth-of-type(1){animation-delay:.05s;}
+  section:nth-of-type(2){animation-delay:.12s;}
+  section:nth-of-type(3){animation-delay:.19s;}
+  section:nth-of-type(4){animation-delay:.26s;}
+  section:nth-of-type(5){animation-delay:.33s;}
+  section:nth-of-type(6){animation-delay:.40s;}
+
+  /* メインボタン: 数秒ごとに光が走るシマー */
+  button:not(.secondary):not(.ai):not(.clear){position:relative; overflow:hidden;}
+  button:not(.secondary):not(.ai):not(.clear)::after{
+    content:""; position:absolute; top:0; left:-70%; width:45%; height:100%;
+    background:linear-gradient(105deg, transparent, rgba(255,255,255,.45), transparent);
+    transform:skewX(-18deg); animation:shimmer 3.4s ease-in-out infinite;}
+  @keyframes shimmer{0%{left:-70%;} 42%{left:130%;} 100%{left:130%;}}
+
+  /* 生成中スピナー(loadingクラスをJSで付与) */
+  button.loading{color:transparent !important; pointer-events:none;}
+  button.loading::before{
+    content:""; position:absolute; top:50%; left:50%; width:19px; height:19px;
+    margin:-10px 0 0 -10px; border-radius:50%;
+    border:2.5px solid rgba(44,23,32,.25); border-top-color:#2c1720;
+    animation:spin .7s linear infinite; z-index:2;}
+  button.secondary.loading::before, button.ai.loading::before{
+    border:2.5px solid rgba(227,167,186,.25); border-top-color:var(--accent);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* 録画中: モニターがローズに呼吸する発光 */
+  #rc.rec{outline:2px solid var(--accent); animation:recGlow 1.6s ease-in-out infinite;}
+  @keyframes recGlow{
+    0%,100%{box-shadow:0 14px 36px rgba(0,0,0,.45), 0 0 0 0 rgba(227,167,186,.0);}
+    50%{box-shadow:0 14px 36px rgba(0,0,0,.45), 0 0 34px 4px rgba(227,167,186,.35);}}
+  .monitor-label .reclive{color:var(--accent); font-weight:700; display:none;}
+  #rc.rec ~ * .reclive{display:inline;}
+
+  /* 進行中ステータスの点滅ドット */
+  .js.working::after{content:" ⋯"; color:var(--accent); font-weight:700;
+    animation:blinkDots 1.1s ease-in-out infinite;}
+  @keyframes blinkDots{0%,100%{opacity:.25;} 50%{opacity:1;}}
+
+  /* 完成ジョブの登場アニメ */
+  .job{animation:fadeUp .4s ease both;}
+
+  /* スライドカード選択のなめらかな浮き上がり */
+  .slide-card{transition:border-color .18s, box-shadow .18s, transform .18s;}
+  .slide-card.active{transform:translateY(-1px);}
 </style>
 </head>
 <body>
@@ -157,7 +208,7 @@
   <div class="mark">髪</div>
   <h1>髪ネタ動画メーカー<span class="dot">.</span></h1>
   <div class="tag">SCRIPT × VOICE × VIDEO</div>
-  <div class="ver">v6</div>
+  <div class="ver">v6.1</div>
 </header>
 
 <!-- 設定 -->
@@ -359,7 +410,7 @@ async function genAiBg(i){
   if(!text){ alert("先にスライド"+(i+1)+"のテロップを入力してください(それを元に背景を作ります)"); return; }
   const btn = document.getElementById("ai"+i);
   const orig = btn.textContent;
-  btn.textContent="生成中..."; btn.disabled=true;
+  btn.textContent="生成中"; btn.disabled=true; btn.classList.add("loading");
   try{
     const res = await fetch(base+"/image", {
       method:"POST", headers:{"Content-Type":"application/json"},
@@ -381,7 +432,7 @@ async function genAiBg(i){
   }catch(e){
     alert("エラー: "+e.message);
   }finally{
-    btn.textContent=orig; btn.disabled=false;
+    btn.textContent=orig; btn.disabled=false; btn.classList.remove("loading");
   }
 }
 
@@ -498,7 +549,8 @@ document.getElementById("genScript").addEventListener("click", async ()=>{
   const base = workerBase();
   if(!base) return;
   setStatus(scriptStatus,"台本を生成中...(10秒ほど)","");
-  document.getElementById("genScript").disabled = true;
+  const gsBtn = document.getElementById("genScript");
+  gsBtn.disabled = true; gsBtn.classList.add("loading");
   try{
     const res = await fetch(base+"/script", {
       method:"POST", headers:{"Content-Type":"application/json"},
@@ -519,7 +571,7 @@ document.getElementById("genScript").addEventListener("click", async ()=>{
     setStatus(scriptStatus,"台本ができました。自由に直してOK","ok");
   }catch(e){
     setStatus(scriptStatus,"エラー: "+e.message,"err");
-  }finally{ document.getElementById("genScript").disabled = false; }
+  }finally{ gsBtn.disabled = false; gsBtn.classList.remove("loading"); }
 });
 
 // ============ 製作ライン(キュー) ============
@@ -752,12 +804,14 @@ async function pump(){
           nxt.status="失敗"; nxt.err = e.message||String(e);
         });
       }
+      hc.classList.add("rec");
       await recordJob(job);
       job.status="完成";
     }catch(e){
       job.status="失敗";
       job.err = e.message || String(e);
     }
+    hc.classList.remove("rec");
     line.queue.shift();
     line.done.unshift(job);
     line.current = null;
@@ -823,7 +877,8 @@ async function shareJob(j){
 function jobRow(j){
   let statusCls = "";
   if(j.status==="完成") statusCls="ok";
-  if(j.status==="失敗") statusCls="err";
+  else if(j.status==="失敗") statusCls="err";
+  else if(j.status==="音声生成中"||j.status==="録画中"||j.status==="録画待ち") statusCls="working";
   let body = "";
   if(j.status==="完成" && j.url){
     body = `
