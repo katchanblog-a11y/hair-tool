@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -11,7 +10,7 @@
 <meta name="theme-color" content="#1c1a1f">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<title>髪ネタ動画メーカー v5.2</title>
+<title>髪ネタ動画メーカー v5.3</title>
 <style>
   :root{
     --bg:#1c1a1f; --surface:#27242b; --surface2:#312d36;
@@ -80,7 +79,7 @@
 </head>
 <body>
 
-<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v5.2</small></h1>
+<h1>髪ネタ動画メーカー<span class="dot">.</span> <small style="font-size:11px;color:var(--sub)">v5.3</small></h1>
 <div class="tag">質問を入れる → 台本を直す → キューに積んで次へ。</div>
 
 <!-- 設定 -->
@@ -550,15 +549,29 @@ async function prepareAudio(job){
 // 録画(1本ずつ・右下ミニ画面に描画)
 async function recordJob(job){
   const ac = getAC();
-  // タイムライン
-  let tcursor = 0.3;
+  await ac.resume();
+  // タイムライン(音声の後に余裕を持たせて尻切れ防止)
+  let tcursor = 0.5;
   const items = job.slides.map((s,k)=>{
     const aDur = job.audios[k] ? job.audios[k].duration : 0;
-    const it = { idx:k, start:tcursor, dur:Math.max(2.5, aDur+0.7) };
+    const it = { idx:k, start:tcursor, dur:Math.max(2.5, aDur+0.9) };
     tcursor += it.dur;
     return it;
   });
-  const total = tcursor + 0.3;
+  const total = tcursor + 1.0;
+
+  // 重要: 録画開始前にチップを表示し、キャンバスに最初のフレームを描いておく
+  // (Safariは未描画キャンバスからの録画開始に失敗して空データを返すことがある)
+  chip.style.display = "flex";
+  renderSlide(hctx, {
+    text: job.slides[0],
+    img: job.imgs[0],
+    isHook: true,
+    theme: job.theme,
+    badge: job.badge,
+    zoom: job.zoom,
+  }, 0);
+  await sleep(400);
 
   const dest = ac.createMediaStreamDestination();
   const stream = new MediaStream([
@@ -622,12 +635,17 @@ async function recordJob(job){
     // 安全装置: 予定時間+3秒で必ず終わらせる
     const guard = setTimeout(finish, (total+3)*1000);
   });
+  // 最後の音声が完全に録り終わるまで少し待ってから停止
+  await sleep(500);
   rec.stop();
   // onstopが来ない場合も5秒で先へ進む(チャンクは揃っている)
   await Promise.race([done, sleep(5000)]);
   sources.forEach(s=>{ try{s.stop();}catch(_){} });
 
   const blob = new Blob(chunks, {type: mime.split(";")[0] || "video/mp4"});
+  if(blob.size < 50000){
+    throw new Error("録画データが空でした。ページを再読み込みしてもう一度お試しください");
+  }
   job.blob = blob;
   job.url = URL.createObjectURL(blob);
   job.ext = mime.includes("mp4") ? "mp4":"webm";
