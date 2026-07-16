@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1c1a1f">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<title>髪ネタ動画メーカー v6.3</title>
+<title>髪ネタ動画メーカー v6.4</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -208,7 +208,7 @@
   <div class="mark">髪</div>
   <h1>髪ネタ動画メーカー<span class="dot">.</span></h1>
   <div class="tag">SCRIPT × VOICE × VIDEO</div>
-  <div class="ver">v6.3</div>
+  <div class="ver">v6.4</div>
 </header>
 
 <!-- 設定 -->
@@ -673,17 +673,19 @@ function makeJob(){
   const slides=[], narrs=[], imgs=[], outros=[];
   for(let i=0;i<SLIDE_COUNT;i++){
     const t = stripPrefix(state.slides[i]||"").trim();
-    if(t){
+    const n = (state.narrs[i]||"").trim();
+    if(t || n){   // テロップかナレーションのどちらかがあれば採用
       slides.push(t);
-      narrs.push((state.narrs[i]||"").trim());
+      narrs.push(n);
       imgs.push(state.imgs[i]||null);
       outros.push(i===SLIDE_COUNT-1 && !state.imgs[i]);
     }
   }
   if(slides.length<2) return null;
+  const firstTitle = slides.find(s=>s) || narrs.find(n=>n) || "無題";
   return {
     id: Date.now().toString(36),
-    title: slides[0].slice(0,16) + (slides[0].length>16?"…":""),
+    title: firstTitle.slice(0,16) + (firstTitle.length>16?"…":""),
     slides, narrs, imgs, outros,
     rate: parseFloat(document.getElementById("rate").value) || 1,
     theme: THEMES[document.getElementById("theme").value],
