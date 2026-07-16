@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1c1a1f">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<title>髪ネタ動画メーカー v6.2</title>
+<title>髪ネタ動画メーカー v6.3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -208,7 +208,7 @@
   <div class="mark">髪</div>
   <h1>髪ネタ動画メーカー<span class="dot">.</span></h1>
   <div class="tag">SCRIPT × VOICE × VIDEO</div>
-  <div class="ver">v6.2</div>
+  <div class="ver">v6.3</div>
 </header>
 
 <!-- 設定 -->
@@ -272,6 +272,8 @@
 <!-- 編集 -->
 <section>
   <h2>2. 台本を直す(タップでプレビュー)</h2>
+  <label>AI背景のこだわり指定(任意)</label>
+  <textarea id="imgPrompt" placeholder="空のままなら、おまかせで毎回違う雰囲気に。書くとその内容で生成します(例: 白い洗面台にピンクのシャンプーボトルが1本、朝の光)"></textarea>
   <div id="slides"></div>
   <div class="preview-wrap"><canvas id="cv" width="720" height="1280"></canvas></div>
   <div class="hint">背景画像ありのスライドは黒帯+白文字、なしは単色デザインになります。</div>
@@ -418,14 +420,15 @@ async function genAiBg(i){
   const base = workerBase();
   if(!base) return;
   const text = stripPrefix(state.slides[i]||"").trim();
-  if(!text){ alert("先にスライド"+(i+1)+"のテロップを入力してください(それを元に背景を作ります)"); return; }
+  const custom = (document.getElementById("imgPrompt").value||"").trim();
+  if(!text && !custom){ alert("先にスライド"+(i+1)+"のテロップを入力してください(それを元に背景を作ります)"); return; }
   const btn = document.getElementById("ai"+i);
   const orig = btn.textContent;
   btn.textContent="生成中"; btn.disabled=true; btn.classList.add("loading");
   try{
     const res = await fetch(base+"/image", {
       method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({text})
+      body: JSON.stringify({text, custom})
     });
     if(!res.ok){
       let msg = "画像生成に失敗しました";
@@ -1017,6 +1020,7 @@ function saveDraft(){
     const d = {
       question: document.getElementById("question").value,
       caption:  document.getElementById("caption").value,
+      imgPrompt: document.getElementById("imgPrompt").value,
       slides: state.slides, narrs: state.narrs,
       workerUrl: document.getElementById("workerUrl").value,
       theme: document.getElementById("theme").value,
@@ -1034,6 +1038,7 @@ function loadDraft(){
     const d = JSON.parse(raw);
     if(d.question!=null) document.getElementById("question").value = d.question;
     if(d.caption!=null)  document.getElementById("caption").value  = d.caption;
+    if(d.imgPrompt!=null) document.getElementById("imgPrompt").value = d.imgPrompt;
     if(Array.isArray(d.slides)) for(let i=0;i<SLIDE_COUNT;i++) state.slides[i]=d.slides[i]||"";
     if(Array.isArray(d.narrs))  for(let i=0;i<SLIDE_COUNT;i++) state.narrs[i]=d.narrs[i]||"";
     if(d.workerUrl) document.getElementById("workerUrl").value = d.workerUrl;
