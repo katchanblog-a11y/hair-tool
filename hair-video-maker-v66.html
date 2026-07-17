@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="髪ネタ">
+<meta name="theme-color" content="#1c1a1f">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<title>髪ネタ動画メーカー v6.6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#161219; --bg2:#1e1822;
+    --surface:#221c27; --surface2:#2c2433; --line:#3b3143; --line-soft:#332a3b;
+    --text:#f4eef2; --sub:#a597a8;
+    --accent:#e3a7ba; --accent-deep:#c07b93; --accent-glow:rgba(227,167,186,.16);
+    --gold:#d8c39a;
+    --ok:#a5dcb8; --err:#e69090;
+    --radius:18px;
+    --serif:"Shippori Mincho","Hiragino Mincho ProN",serif;
+    --sans:"Zen Kaku Gothic New",-apple-system,"Hiragino Sans",sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html{scroll-behavior:smooth;}
+  body{margin:0; color:var(--text); font-family:var(--sans);
+    background:
+      radial-gradient(1000px 500px at 50% -180px, rgba(227,167,186,.10), transparent 60%),
+      radial-gradient(700px 400px at 110% 30%, rgba(216,195,154,.05), transparent 60%),
+      var(--bg);
+    padding:22px 16px calc(110px + env(safe-area-inset-bottom));
+    min-height:100vh;}
+
+  /* ヘッダー */
+  header{margin:6px 0 24px; text-align:center;}
+  header .mark{display:inline-flex; align-items:center; justify-content:center;
+    width:46px; height:46px; border-radius:14px; margin-bottom:10px;
+    background:linear-gradient(160deg, #eebccb, var(--accent-deep));
+    font-family:var(--serif); font-size:24px; font-weight:700; color:#241017;
+    box-shadow:0 6px 22px var(--accent-glow);}
+  header h1{font-family:var(--serif); font-size:23px; font-weight:700;
+    letter-spacing:.14em; margin:0 0 6px;}
+  header h1 .dot{color:var(--accent);}
+  header .tag{font-size:11px; color:var(--sub); letter-spacing:.22em;}
+  header .ver{display:inline-block; margin-top:8px; font-size:10px; color:var(--accent);
+    border:1px solid var(--line); border-radius:999px; padding:3px 12px; letter-spacing:.14em;}
+
+  /* セクション */
+  section{position:relative; background:linear-gradient(180deg, var(--surface), var(--bg2));
+    border:1px solid var(--line-soft); border-radius:var(--radius);
+    padding:20px 16px 18px; margin-bottom:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);}
+  section::before{content:""; position:absolute; top:0; left:22px; right:22px; height:1px;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent); opacity:.5;}
+  section h2{font-family:var(--serif); font-size:15px; margin:0 0 14px;
+    color:var(--text); letter-spacing:.12em; font-weight:600;
+    display:flex; align-items:baseline; gap:10px;}
+  section h2::after{content:""; flex:1; height:1px; background:var(--line-soft);}
+
+  label{display:block; font-size:11px; color:var(--sub); margin:10px 0 5px; letter-spacing:.08em;}
+  input[type=text], textarea, select{
+    width:100%; background:rgba(0,0,0,.28); color:var(--text);
+    border:1px solid var(--line); border-radius:12px; padding:11px 13px;
+    font-size:16px; font-family:var(--sans); outline:none;
+    transition:border-color .18s, box-shadow .18s; -webkit-appearance:none;}
+  input:focus, textarea:focus, select:focus{border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-glow);}
+  textarea{resize:vertical; min-height:46px; line-height:1.6;}
+
+  button{appearance:none; border:none; border-radius:13px; padding:14px 16px;
+    font-size:15px; font-weight:700; font-family:var(--sans); width:100%;
+    background:linear-gradient(160deg, #efc3d1, var(--accent) 55%, var(--accent-deep));
+    color:#2c1720; margin-top:12px; letter-spacing:.05em;
+    box-shadow:0 6px 18px var(--accent-glow); transition:transform .12s, filter .18s;}
+  button:active{transform:scale(.985); filter:brightness(.94);}
+  button.secondary{background:var(--surface2); color:var(--text);
+    border:1px solid var(--line); box-shadow:none;}
+  button:disabled{opacity:.45;}
+
+  /* スライドカード */
+  .slide-card{position:relative; background:var(--surface2);
+    border:1px solid var(--line-soft); border-radius:14px;
+    padding:12px 12px 12px 14px; margin-bottom:12px;
+    transition:border-color .18s, box-shadow .18s;}
+  .slide-card.active{border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-glow), 0 8px 24px rgba(0,0,0,.25);}
+  .slide-card.active::before{content:""; position:absolute; left:0; top:14px; bottom:14px;
+    width:3px; border-radius:3px; background:var(--accent);}
+  .slide-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+  .slide-head b{font-size:12px; color:var(--accent); letter-spacing:.08em; font-weight:700;}
+  .slide-head span{font-size:10px; color:var(--sub); letter-spacing:.06em;}
+  .slide-card textarea{margin-bottom:7px;}
+  .imgrow{display:flex; align-items:center; gap:9px; margin-top:4px;}
+  .imgrow input[type=file]{font-size:12px; color:var(--sub); flex:1; background:none; border:none; padding:6px 0;}
+  .imgrow .thumb{width:38px; height:38px; border-radius:10px; object-fit:cover;
+    border:1px solid var(--line); display:none;}
+  .imgrow .clear{font-size:11px; color:var(--err); background:none; border:none;
+    padding:6px; width:auto; margin:0; display:none; box-shadow:none;}
+  .imgrow .ai{font-size:12px; background:rgba(227,167,186,.10); color:var(--accent);
+    border:1px solid var(--accent); border-radius:10px; padding:9px 13px;
+    width:auto; margin:0; font-weight:700; box-shadow:none;}
+
+  /* プレビュー・モニター(端末風フレーム) */
+  .preview-wrap{display:flex; justify-content:center; margin-top:16px;}
+  #cv, #rc{width:212px; height:377px; border-radius:22px; background:#000;
+    border:6px solid #0c090e; outline:1px solid var(--line);
+    box-shadow:0 14px 36px rgba(0,0,0,.45); display:block;}
+  #rc{margin:0 auto 12px;}
+  .monitor-label{font-size:10px; color:var(--sub); text-align:center;
+    margin-bottom:10px; letter-spacing:.22em;}
+
+  .row{display:flex; gap:10px;}
+  .row > *{flex:1;}
+  .status{font-size:12px; margin-top:10px; min-height:16px; color:var(--sub);
+    word-break:break-all; line-height:1.6;}
+  .status.ok{color:var(--ok);} .status.err{color:var(--err);}
+  .copybox button{width:auto; padding:9px 16px; font-size:12px; margin-top:10px;}
+  .hint{font-size:11px; color:var(--sub); line-height:1.8; margin-top:10px;}
+
+  /* 製作ライン */
+  #lineStatus{font-family:var(--serif); font-size:13px; font-weight:600;
+    letter-spacing:.08em; margin-bottom:12px; text-align:center; color:var(--gold);}
+  .job{background:var(--surface2); border:1px solid var(--line-soft);
+    border-radius:14px; padding:13px; margin-bottom:10px;}
+  .job .jt{font-size:13px; font-weight:700; margin-bottom:3px; letter-spacing:.03em;}
+  .job .js{font-size:12px; color:var(--sub); line-height:1.6;}
+  .job .js.ok{color:var(--ok);} .job .js.err{color:var(--err);}
+  .job video{width:150px; border-radius:14px; margin:10px auto 0; display:block;
+    border:1px solid var(--line); box-shadow:0 8px 22px rgba(0,0,0,.35);}
+  .job a.dl{display:block; text-align:center; margin-top:10px; color:var(--accent);
+    font-weight:700; font-size:13px; text-decoration:none;
+    border:1px solid var(--accent); border-radius:11px; padding:10px;
+    background:rgba(227,167,186,.07); letter-spacing:.05em;}
+  .job button.cap{width:100%; padding:10px; font-size:12px; margin-top:7px;}
+
+  /* 製作中チップ */
+  #chip{position:fixed; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); z-index:50;
+    background:rgba(26,20,30,.92); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--accent); border-radius:16px;
+    padding:11px 14px; display:none; align-items:center; gap:10px;
+    box-shadow:0 10px 32px rgba(0,0,0,.55);}
+  #chip::before{content:""; width:8px; height:8px; border-radius:50%;
+    background:var(--accent); animation:pulse 1.4s ease-in-out infinite; flex:none;}
+  @keyframes pulse{0%,100%{opacity:1; transform:scale(1);} 50%{opacity:.35; transform:scale(.8);}}
+  #chipText{font-size:11px; line-height:1.55; max-width:175px;}
+  #chipText b{color:var(--accent); font-size:12px;}
+
+  /* ===== モーション演出 ===== */
+  /* 起動時: セクションが順にふわっと出現 */
+  @keyframes fadeUp{from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:none;}}
+  header{animation:fadeUp .55s ease both;}
+  section{animation:fadeUp .55s ease both;}
+  section:nth-of-type(1){animation-delay:.05s;}
+  section:nth-of-type(2){animation-delay:.12s;}
+  section:nth-of-type(3){animation-delay:.19s;}
+  section:nth-of-type(4){animation-delay:.26s;}
+  section:nth-of-type(5){animation-delay:.33s;}
+  section:nth-of-type(6){animation-delay:.40s;}
+
+  /* メインボタン: 数秒ごとに光が走るシマー */
+  button:not(.secondary):not(.ai):not(.clear){position:relative; overflow:hidden;}
+  button:not(.secondary):not(.ai):not(.clear)::after{
+    content:""; position:absolute; top:0; left:-70%; width:45%; height:100%;
+    background:linear-gradient(105deg, transparent, rgba(255,255,255,.45), transparent);
+    transform:skewX(-18deg); animation:shimmer 3.4s ease-in-out infinite;}
+  @keyframes shimmer{0%{left:-70%;} 42%{left:130%;} 100%{left:130%;}}
+
+  /* 生成中スピナー(loadingクラスをJSで付与) */
+  button.loading{color:transparent !important; pointer-events:none;}
+  button.loading::before{
+    content:""; position:absolute; top:50%; left:50%; width:19px; height:19px;
+    margin:-10px 0 0 -10px; border-radius:50%;
+    border:2.5px solid rgba(44,23,32,.25); border-top-color:#2c1720;
+    animation:spin .7s linear infinite; z-index:2;}
+  button.secondary.loading::before, button.ai.loading::before{
+    border:2.5px solid rgba(227,167,186,.25); border-top-color:var(--accent);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* 録画中: モニターがローズに呼吸する発光 */
+  #rc.rec{outline:2px solid var(--accent); animation:recGlow 1.6s ease-in-out infinite;}
+  @keyframes recGlow{
+    0%,100%{box-shadow:0 14px 36px rgba(0,0,0,.45), 0 0 0 0 rgba(227,167,186,.0);}
+    50%{box-shadow:0 14px 36px rgba(0,0,0,.45), 0 0 34px 4px rgba(227,167,186,.35);}}
+  .monitor-label .reclive{color:var(--accent); font-weight:700; display:none;}
+  #rc.rec ~ * .reclive{display:inline;}
+
+  /* 進行中ステータスの点滅ドット */
+  .js.working::after{content:" ⋯"; color:var(--accent); font-weight:700;
+    animation:blinkDots 1.1s ease-in-out infinite;}
+  @keyframes blinkDots{0%,100%{opacity:.25;} 50%{opacity:1;}}
+
+  /* 完成ジョブの登場アニメ */
+  .job{animation:fadeUp .4s ease both;}
+
+  /* スライドカード選択のなめらかな浮き上がり */
+  .slide-card{transition:border-color .18s, box-shadow .18s, transform .18s;}
+  .slide-card.active{transform:translateY(-1px);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="mark">髪</div>
+  <h1>髪ネタ動画メーカー<span class="dot">.</span></h1>
+  <div class="tag">SCRIPT × VOICE × VIDEO</div>
+  <div class="ver">v6.6</div>
+</header>
+
+<!-- 設定 -->
+<section>
+  <h2>SETTING</h2>
+  <label>Worker URL</label>
+  <input type="text" id="workerUrl" value="https://tiktok-hair-tool.katchan-blog.workers.dev">
+  <div class="row">
+    <div>
+      <label>スライドの雰囲気</label>
+      <select id="theme">
+        <option value="beige">サロンベージュ</option>
+        <option value="night">ナイト</option>
+        <option value="white">クリーンホワイト</option>
+      </select>
+    </div>
+    <div>
+      <label>ナレーターの声</label>
+      <select id="speaker">
+        <option value="3">ずんだもん</option>
+        <option value="2">四国めたん</option>
+        <option value="8">春日部つむぎ</option>
+      </select>
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>ズームの動き</label>
+      <select id="zoom">
+        <option value="0.02" selected>ひかえめ</option>
+        <option value="0">なし</option>
+      </select>
+    </div>
+    <div>
+      <label>肩書き(固定表示)</label>
+      <input type="text" id="badge" value="現役美容師の髪ネタ">
+    </div>
+  </div>
+  <div class="row">
+    <div>
+      <label>話す速さ</label>
+      <select id="rate">
+        <option value="1">ふつう</option>
+        <option value="1.15" selected>すこし早め</option>
+        <option value="1.3">早め</option>
+      </select>
+    </div>
+    <div></div>
+  </div>
+</section>
+
+<!-- 台本生成 -->
+<section>
+  <h2>1. 台本をつくる</h2>
+  <label>お客様に聞かれた質問・髪の悩み</label>
+  <textarea id="question" placeholder="例: 白髪って抜いていいの?"></textarea>
+  <button id="genScript">台本を生成</button>
+  <div class="status" id="scriptStatus"></div>
+</section>
+
+<!-- 編集 -->
+<section>
+  <h2>2. 台本を直す(タップでプレビュー)</h2>
+  <label>AI背景のこだわり指定(任意)</label>
+  <textarea id="imgPrompt" placeholder="空のままなら、おまかせで毎回違う雰囲気に。書くとその内容で生成します(例: 白い洗面台にピンクのシャンプーボトルが1本、朝の光)"></textarea>
+  <div id="slides"></div>
+  <div class="preview-wrap"><canvas id="cv" width="720" height="1280"></canvas></div>
+  <div class="hint">背景画像ありのスライドは黒帯+白文字、なしは単色デザインになります。</div>
+</section>
+
+<!-- キャプション -->
+<section>
+  <h2>3. キャプション</h2>
+  <div class="copybox">
+    <textarea id="caption" placeholder="台本生成でここにキャプション+ハッシュタグが入ります"></textarea>
+    <button class="secondary" id="copyCap">キャプションをコピー</button>
+  </div>
+</section>
+
+<!-- 動画生成 -->
+<section>
+  <h2>4. 動画をつくる</h2>
+  <button id="genNow">生成して待つ</button>
+  <button id="genNext" class="secondary">キューに追加して次のネタへ</button>
+  <div class="status" id="videoStatus"></div>
+  <div class="hint">
+    「キューに追加」を押すと、この台本は裏の製作ラインに送られ、編集欄はリセットされて次のネタをすぐ作れます。<br>
+    製作中はこのSafariの画面を開いたままにしてください(他アプリに切り替えると録画が止まります)。<br>
+    BGMは投稿時にTikTokアプリ内でつけてください(流行音源が有利)。
+  </div>
+</section>
+
+<!-- 製作ライン -->
+<section>
+  <h2>5. 製作ライン</h2>
+  <div class="monitor-label">製作モニター(録画中の映像がここに映ります)</div>
+  <canvas id="rc" width="720" height="1280"></canvas>
+  <div id="lineStatus">製作中 0本 / 待機 0本 / 完成 0本</div>
+  <div id="jobs"><div class="hint">まだ動画がありません。</div></div>
+</section>
+
+<!-- キャプション履歴 -->
+<section>
+  <h2>6. キャプション履歴(端末に保存)</h2>
+  <div id="history"></div>
+  <button id="clearHist" class="secondary">履歴を全部消す</button>
+  <div class="hint">キューに追加した動画のタイトルとキャプションが自動で残ります(最新50件)。タブを閉じても消えません。</div>
+</section>
+
+<!-- 製作中チップ -->
+<div id="chip">
+  <div id="chipText"></div>
+</div>
+
+<script>
+// ============ 状態 ============
+const SLIDE_COUNT = 6;
+const state = {
+  slides: Array(SLIDE_COUNT).fill(""),
+  narrs:  Array(SLIDE_COUNT).fill(""),
+  imgs:   Array(SLIDE_COUNT).fill(null),
+  active: 0,
+};
+
+const THEMES = {
+  beige:{ bg:"#f1e8e2", text:"#3a2e2a", accent:"#b0806b", badgeText:"#f7f2ee" },
+  night:{ bg:"#221f26", text:"#f5eff2", accent:"#d9a0b3", badgeText:"#2a1e23" },
+  white:{ bg:"#ffffff", text:"#26221f", accent:"#c4586e", badgeText:"#ffffff" },
+};
+
+// ============ スライド編集UI ============
+const slidesEl = document.getElementById("slides");
+const NAMES = ["掴み","共感","ポイント①","ポイント②","ポイント③","誘導"];
+function buildSlideCards(){
+  slidesEl.innerHTML = "";
+  for(let i=0;i<SLIDE_COUNT;i++){
+    const card = document.createElement("div");
+    card.className = "slide-card" + (i===state.active ? " active":"");
+    card.innerHTML = `
+      <div class="slide-head"><b>スライド${i+1} / ${NAMES[i]}</b><span>タップでプレビュー</span></div>
+      <textarea data-type="slide" data-i="${i}" placeholder="テロップ(短く)">${esc(state.slides[i])}</textarea>
+      <textarea data-type="narr" data-i="${i}" placeholder="ナレーション(話し言葉)">${esc(state.narrs[i])}</textarea>
+      <div class="imgrow">
+        <input type="file" accept="image/*" data-type="img" data-i="${i}">
+        <button class="ai" id="ai${i}" type="button">AI背景</button>
+        <img class="thumb" id="thumb${i}">
+        <button class="clear" id="clear${i}" type="button">外す</button>
+      </div>`;
+    card.addEventListener("click", (e)=>{
+      if(e.target.tagName==="TEXTAREA"||e.target.tagName==="INPUT"||e.target.tagName==="BUTTON") {
+        setActive(i, false); return;
+      }
+      setActive(i);
+    });
+    slidesEl.appendChild(card);
+    document.getElementById("clear"+i).addEventListener("click", ()=>{
+      state.imgs[i]=null;
+      updateThumb(i);
+      if(i===state.active) drawPreview(i);
+    });
+    document.getElementById("ai"+i).addEventListener("click", ()=>genAiBg(i));
+  }
+}
+function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+function stripPrefix(s){
+  return (s||"")
+    .replace(/^スライド\s*\d+\s*[::]\s*/,"")
+    .replace(/^(掴み|共感|ポイント[①②③123]?|誘導)\s*[::]\s*/,"")
+    .trim();
+}
+
+slidesEl.addEventListener("input", (e)=>{
+  const t = e.target;
+  if(!t.dataset) return;
+  const i = Number(t.dataset.i);
+  if(t.dataset.type==="slide") state.slides[i] = t.value;
+  if(t.dataset.type==="narr")  state.narrs[i]  = t.value;
+  if(i===state.active) drawPreview(i);
+});
+slidesEl.addEventListener("change", (e)=>{
+  const t = e.target;
+  if(t.dataset && t.dataset.type==="img" && t.files && t.files[0]){
+    const i = Number(t.dataset.i);
+    const img = new Image();
+    img.onload = ()=>{
+      state.imgs[i] = img;
+      updateThumb(i);
+      setActive(i);
+    };
+    img.src = URL.createObjectURL(t.files[0]);
+  }
+});
+function updateThumb(i){
+  const th = document.getElementById("thumb"+i);
+  const cl = document.getElementById("clear"+i);
+  if(state.imgs[i]){ th.src = state.imgs[i].src; th.style.display="block"; cl.style.display="block"; }
+  else{ th.style.display="none"; cl.style.display="none"; }
+}
+function setActive(i, redrawCards=true){
+  state.active = i;
+  if(redrawCards){
+    document.querySelectorAll(".slide-card").forEach((c,idx)=>c.classList.toggle("active", idx===i));
+  }
+  drawPreview(i);
+}
+
+// AI背景画像を生成してスライドにセット
+async function genAiBg(i){
+  const base = workerBase();
+  if(!base) return;
+  const text = stripPrefix(state.slides[i]||"").trim();
+  const custom = (document.getElementById("imgPrompt").value||"").trim();
+  if(!text && !custom){ alert("先にスライド"+(i+1)+"のテロップを入力してください(それを元に背景を作ります)"); return; }
+  const btn = document.getElementById("ai"+i);
+  const orig = btn.textContent;
+  btn.textContent="生成中"; btn.disabled=true; btn.classList.add("loading");
+  try{
+    const res = await fetch(base+"/image", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({text, custom})
+    });
+    if(!res.ok){
+      let msg = "画像生成に失敗しました";
+      try{ const j = await res.json(); if(j.error) msg = j.error + (j.detail?" / "+String(j.detail).slice(0,150):""); }catch(_){}
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const img = new Image();
+    img.onload = ()=>{
+      state.imgs[i] = img;
+      updateThumb(i);
+      setActive(i);
+    };
+    img.src = URL.createObjectURL(blob);
+  }catch(e){
+    alert("エラー: "+e.message);
+  }finally{
+    btn.textContent=orig; btn.disabled=false; btn.classList.remove("loading");
+  }
+}
+
+// ============ Canvas 共通描画 ============
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+const hc = document.getElementById("rc");        // 録画用(製作モニター・常時表示)
+const hctx = hc.getContext("2d");
+const W=720, H=1280;
+
+// スライド6用の固定アウトロ画像(リポジトリ内の outro.png)
+const outroImg = new Image();
+outroImg.src = "outro.png";
+outroImg.onload = ()=>{ try{ drawPreview(state.active); }catch(e){} };
+
+// アウトロ用の吹き出し(しっぽが上向きで「実践してね!」を指す)
+function drawBubble(c, text){
+  let size = 46;
+  c.textAlign="center"; c.textBaseline="middle";
+  let lines;
+  while(true){
+    c.font = `bold ${size}px "Hiragino Sans", sans-serif`;
+    lines = wrapText(c, text, W-240);
+    if(lines.length <= 3 || size <= 32) break;
+    size -= 3;
+  }
+  const lh = size*1.45;
+  let maxW = 0;
+  for(const ln of lines){ maxW = Math.max(maxW, c.measureText(ln).width); }
+  const bw = Math.min(W-90, maxW + 76);
+  const bh = lines.length*lh + 44;
+  const bx = (W-bw)/2;
+  const tailTipY = H*0.605;             // しっぽの先端(上向き)
+  const by = tailTipY + 26;             // 吹き出し本体の上辺
+  // しっぽ(上向き三角)
+  c.fillStyle = "#fffaf3";
+  c.strokeStyle = "#4a3228";
+  c.lineWidth = 6;
+  c.lineJoin = "round";
+  // 本体
+  roundRect(c, bx, by, bw, bh, 24);
+  c.fill(); c.stroke();
+  c.beginPath();
+  c.moveTo(W/2 - 24, by + 4);
+  c.lineTo(W/2, tailTipY);
+  c.lineTo(W/2 + 24, by + 4);
+  c.closePath();
+  c.fill();
+  // しっぽの輪郭(本体との境界線は描かない)
+  c.beginPath();
+  c.moveTo(W/2 - 24, by + 3);
+  c.lineTo(W/2, tailTipY);
+  c.lineTo(W/2 + 24, by + 3);
+  c.stroke();
+  // テキスト
+  c.fillStyle = "#4a3228";
+  const startY = by + bh/2 - (lines.length-1)*lh/2;
+  lines.forEach((ln,idx)=> c.fillText(ln, W/2, startY + idx*lh + 2));
+}
+
+// opt: {text, img, isHook, theme(オブジェクト), badge, zoom, outro}, t: 0〜1
+function renderSlide(c, opt, t){
+  // アウトロ(スライド6固定画像+吹き出し)
+  if(opt.outro && outroImg.complete && outroImg.naturalWidth){
+    c.save();
+    const sc = 1 + opt.zoom*t;
+    c.translate(W/2, H/2); c.scale(sc, sc); c.translate(-W/2, -H/2);
+    const s = Math.max(W/outroImg.naturalWidth, H/outroImg.naturalHeight);
+    const dw = outroImg.naturalWidth*s, dh = outroImg.naturalHeight*s;
+    c.drawImage(outroImg, (W-dw)/2, (H-dh)/2, dw, dh);
+    if(opt.text) drawBubble(c, opt.text);
+    c.restore();
+    return;
+  }
+  const th = opt.theme;
+  const img = opt.img;
+  c.save();
+  const scale = 1 + opt.zoom*t;
+  c.translate(W/2, H/2); c.scale(scale, scale); c.translate(-W/2, -H/2);
+
+  if(img){
+    const s = Math.max(W/img.naturalWidth, H/img.naturalHeight);
+    const dw = img.naturalWidth*s, dh = img.naturalHeight*s;
+    c.drawImage(img, (W-dw)/2, (H-dh)/2, dw, dh);
+    const g = c.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"rgba(0,0,0,.55)");
+    g.addColorStop(.5,"rgba(0,0,0,.35)");
+    g.addColorStop(1,"rgba(0,0,0,.55)");
+    c.fillStyle = g; c.fillRect(-40,-40,W+80,H+80);
+  }else{
+    c.fillStyle = th.bg; c.fillRect(-40,-40,W+80,H+80);
+    c.fillStyle = th.accent; c.fillRect(-40, 0, W+80, 10);
+  }
+
+  if(opt.badge){
+    c.font = 'bold 30px "Hiragino Sans", sans-serif';
+    const bw = c.measureText(opt.badge).width + 56;
+    const bx = (W-bw)/2, by = 90, bh = 62;
+    c.fillStyle = th.accent;
+    roundRect(c, bx, by, bw, bh, 31); c.fill();
+    c.fillStyle = th.badgeText;
+    c.textAlign="center"; c.textBaseline="middle";
+    c.fillText(opt.badge, W/2, by+bh/2+2);
+  }
+
+  const text = opt.text || "";
+  if(text){
+    const isHook = opt.isHook;
+    let size = isHook ? 72 : 58;
+    c.textAlign="center"; c.textBaseline="middle";
+    let lines;
+    while(true){
+      c.font = `bold ${size}px "Hiragino Sans", sans-serif`;
+      lines = wrapText(c, text, W-170);
+      if(lines.length*size*1.7 < H*0.52 || size<=40) break;
+      size -= 4;
+    }
+    const lh = size*1.7;
+    const startY = H/2 - (lines.length-1)*lh/2;
+    lines.forEach((ln,idx)=>{
+      const y = startY + idx*lh;
+      const tw = c.measureText(ln).width;
+      if(isHook){
+        c.fillStyle = th.accent;
+        roundRect(c, (W-tw)/2-30, y-size*0.74, tw+60, size*1.48, 16); c.fill();
+        c.fillStyle = th.badgeText;
+      }else if(img){
+        c.fillStyle = "rgba(0,0,0,.6)";
+        roundRect(c, (W-tw)/2-26, y-size*0.72, tw+52, size*1.44, 14); c.fill();
+        c.fillStyle = "#ffffff";
+      }else{
+        c.fillStyle = th.text;
+      }
+      c.fillText(ln, W/2, y+2);
+    });
+  }
+  c.restore();
+}
+function wrapText(c, text, maxW){
+  const lines=[]; let line="";
+  for(const ch of text){
+    if(ch==="\n"){ lines.push(line); line=""; continue; }
+    const test = line + ch;
+    if(c.measureText(test).width > maxW && line){ lines.push(line); line=ch; }
+    else line = test;
+  }
+  if(line) lines.push(line);
+  return lines;
+}
+function roundRect(c,x,y,w,h,r){
+  c.beginPath();
+  c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
+}
+
+// 編集画面のプレビュー(現在の入力内容から描画)
+function drawPreview(i){
+  renderSlide(ctx, {
+    text: stripPrefix(state.slides[i]||""),
+    img: state.imgs[i],
+    isHook: i===0,
+    outro: (i===SLIDE_COUNT-1 && !state.imgs[i]),
+    theme: THEMES[document.getElementById("theme").value],
+    badge: document.getElementById("badge").value || "",
+    zoom: parseFloat(document.getElementById("zoom").value),
+  }, 0);
+}
+document.getElementById("theme").addEventListener("change", ()=>drawPreview(state.active));
+document.getElementById("badge").addEventListener("input", ()=>drawPreview(state.active));
+document.getElementById("zoom").addEventListener("change", ()=>drawPreview(state.active));
+
+// ============ 台本生成 ============
+const scriptStatus = document.getElementById("scriptStatus");
+document.getElementById("genScript").addEventListener("click", async ()=>{
+  const q = document.getElementById("question").value.trim();
+  if(!q){ setStatus(scriptStatus,"質問を入力してください","err"); return; }
+  const base = workerBase();
+  if(!base) return;
+  setStatus(scriptStatus,"台本を生成中...(10秒ほど)","");
+  const gsBtn = document.getElementById("genScript");
+  gsBtn.disabled = true; gsBtn.classList.add("loading");
+  try{
+    const res = await fetch(base+"/script", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({question:q})
+    });
+    const data = await res.json();
+    if(data.error) throw new Error(data.error + (data.detail?" / "+JSON.stringify(data.detail).slice(0,120):""));
+    for(let i=0;i<SLIDE_COUNT;i++){
+      state.slides[i] = stripPrefix((data.slides && data.slides[i]) || "");
+      state.narrs[i]  = stripPrefix((data.narration && data.narration[i]) || "");
+      state.imgs[i]   = state.imgs[i]; // 画像は維持
+    }
+    document.getElementById("caption").value =
+      (data.caption||"") + "\n" + ((data.hashtags||[]).join(" "));
+    buildSlideCards();
+    for(let i=0;i<SLIDE_COUNT;i++) updateThumb(i);
+    setActive(0);
+    setStatus(scriptStatus,"台本ができました。自由に直してOK","ok");
+  }catch(e){
+    setStatus(scriptStatus,"エラー: "+e.message,"err");
+  }finally{ gsBtn.disabled = false; gsBtn.classList.remove("loading"); }
+});
+
+// ============ 製作ライン(キュー) ============
+const line = { queue:[], done:[], running:false, current:null };
+const videoStatus = document.getElementById("videoStatus");
+const jobsEl = document.getElementById("jobs");
+const lineStatusEl = document.getElementById("lineStatus");
+const chip = document.getElementById("chip");
+const chipText = document.getElementById("chipText");
+
+let audioCtxG = null;
+function getAC(){
+  if(!audioCtxG){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtxG = new AC();
+  }
+  return audioCtxG;
+}
+
+// 現在の編集内容からジョブ(製作指示書)を作る
+function makeJob(){
+  const slides=[], narrs=[], imgs=[], outros=[];
+  for(let i=0;i<SLIDE_COUNT;i++){
+    const t = stripPrefix(state.slides[i]||"").trim();
+    const n = (state.narrs[i]||"").trim();
+    if(t || n){   // テロップかナレーションのどちらかがあれば採用
+      slides.push(t);
+      narrs.push(n);
+      imgs.push(state.imgs[i]||null);
+      outros.push(i===SLIDE_COUNT-1 && !state.imgs[i]);
+    }
+  }
+  if(slides.length<2) return null;
+  const firstTitle = slides.find(s=>s) || narrs.find(n=>n) || "無題";
+  return {
+    id: Date.now().toString(36),
+    title: firstTitle.slice(0,16) + (firstTitle.length>16?"…":""),
+    slides, narrs, imgs, outros,
+    rate: parseFloat(document.getElementById("rate").value) || 1,
+    theme: THEMES[document.getElementById("theme").value],
+    badge: document.getElementById("badge").value || "",
+    zoom: parseFloat(document.getElementById("zoom").value),
+    speaker: document.getElementById("speaker").value,
+    caption: document.getElementById("caption").value || "",
+    status:"待機中", detail:"", url:null, ext:null, err:null,
+    prepPromise:null, audios:null,
+  };
+}
+
+function clearForm(){
+  for(let i=0;i<SLIDE_COUNT;i++){
+    state.slides[i]=""; state.narrs[i]=""; state.imgs[i]=null;
+  }
+  document.getElementById("question").value="";
+  document.getElementById("caption").value="";
+  buildSlideCards();
+  for(let i=0;i<SLIDE_COUNT;i++) updateThumb(i);
+  setActive(0);
+  saveDraft();
+}
+
+document.getElementById("genNow").addEventListener("click", ()=>{
+  getAC().resume();
+  const job = makeJob();
+  if(!job){ setStatus(videoStatus,"スライドが2枚以上必要です","err"); return; }
+  line.queue.push(job);
+  pushHistory(job);
+  setStatus(videoStatus,"製作ラインに送りました。このまま画面を開いて待っていてください","ok");
+  updateLineUI();
+  pump();
+});
+
+document.getElementById("genNext").addEventListener("click", ()=>{
+  getAC().resume();
+  const job = makeJob();
+  if(!job){ setStatus(videoStatus,"スライドが2枚以上必要です","err"); return; }
+  line.queue.push(job);
+  pushHistory(job);
+  clearForm();
+  setStatus(videoStatus,"キューに追加しました("+job.title+")。次のネタをどうぞ!","ok");
+  updateLineUI();
+  pump();
+  window.scrollTo({top:0, behavior:"smooth"});
+});
+
+// ナレーション音声の準備(先読み対応)
+async function prepareAudio(job){
+  const base = workerBase();
+  if(!base) throw new Error("Worker URL未設定");
+  const ac = getAC();
+  job.audios = [];
+  for(let k=0;k<job.slides.length;k++){
+    const narr = job.narrs[k];
+    if(narr){
+      job.status="音声生成中"; job.detail=`${k+1}/${job.slides.length}`;
+      updateLineUI();
+      const r = await fetch(base+"/tts?speaker="+job.speaker+"&text="+encodeURIComponent(narr.slice(0,300)));
+      if(!r.ok) throw new Error("音声生成に失敗(スライド"+(k+1)+")");
+      const buf = await r.arrayBuffer();
+      job.audios[k] = await ac.decodeAudioData(buf);
+      if(k < job.slides.length-1) await sleep(1000);
+    }else{
+      job.audios[k] = null;
+    }
+  }
+  job.status="録画待ち"; job.detail="";
+  updateLineUI();
+}
+
+// 録画(1本ずつ・右下ミニ画面に描画)
+async function recordJob(job){
+  const ac = getAC();
+  await ac.resume();
+  const rate = job.rate || 1;
+  // タイムライン(音声の後に余裕を持たせて尻切れ防止)
+  let tcursor = 0.5;
+  const items = job.slides.map((s,k)=>{
+    const aDur = job.audios[k] ? (job.audios[k].duration / rate) : 0;
+    const isLast = (k === job.slides.length-1);
+    const it = { idx:k, start:tcursor, dur:Math.max(2.2, aDur + (isLast ? 2.0 : 0.9)) };
+    tcursor += it.dur;
+    return it;
+  });
+  const total = tcursor + 2.0;
+
+  // 重要: 録画開始前にチップを表示し、キャンバスに最初のフレームを描いておく
+  // (Safariは未描画キャンバスからの録画開始に失敗して空データを返すことがある)
+  chip.style.display = "flex";
+  renderSlide(hctx, {
+    text: job.slides[0],
+    img: job.imgs[0],
+    isHook: true,
+    theme: job.theme,
+    badge: job.badge,
+    zoom: job.zoom,
+  }, 0);
+  await sleep(400);
+
+  const dest = ac.createMediaStreamDestination();
+  const stream = new MediaStream([
+    ...hc.captureStream(30).getVideoTracks(),
+    ...dest.stream.getAudioTracks(),
+  ]);
+  let mime = "";
+  for(const m of ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"]){
+    if(MediaRecorder.isTypeSupported(m)){ mime=m; break; }
+  }
+  const rec = new MediaRecorder(stream, mime?{mimeType:mime}:undefined);
+  const chunks=[];
+  rec.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
+  const done = new Promise(res=> rec.onstop = res);
+
+  job.status="録画中"; updateLineUI();
+  rec.start(500);
+  const t0 = ac.currentTime + 0.1;
+  const sources = [];
+  for(const it of items){
+    const buf = job.audios[it.idx];
+    if(!buf) continue;
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    src.connect(dest);
+    src.start(t0 + it.start);
+    sources.push(src);
+  }
+  const startMs = performance.now() + 100;
+  // rAFはSafariに止められることがあるため、タイマー方式+安全装置で回す
+  await new Promise((resolve)=>{
+    let finished = false;
+    const finish = ()=>{
+      if(finished) return;
+      finished = true;
+      clearInterval(iv);
+      clearTimeout(guard);
+      resolve();
+    };
+    const iv = setInterval(()=>{
+      try{
+        const el = (performance.now()-startMs)/1000;
+        if(el >= total){ finish(); return; }
+        let cur = items[0];
+        for(const it of items){ if(el >= it.start) cur = it; }
+        const t = Math.min(1, Math.max(0,(el-cur.start)/cur.dur));
+        renderSlide(hctx, {
+          text: job.slides[cur.idx],
+          img: job.imgs[cur.idx],
+          isHook: cur.idx===0,
+          outro: !!(job.outros && job.outros[cur.idx]),
+          theme: job.theme,
+          badge: job.badge,
+          zoom: job.zoom,
+        }, t);
+        job.detail = "残り"+Math.max(0,Math.ceil(total-el))+"秒";
+        updateChip();
+      }catch(e){
+        finish();
+      }
+    }, 50);
+    // 安全装置: 予定時間+3秒で必ず終わらせる
+    const guard = setTimeout(finish, (total+3)*1000);
+  });
+  // 最後の音声が完全に録り終わるまで待ってから、データを回収して停止
+  // (iOS Safariは停止時に末尾の録画データを取りこぼすことがあるため)
+  await sleep(1200);
+  try{ rec.requestData(); }catch(e){}
+  await sleep(300);
+  rec.stop();
+  // onstopが来ない場合も5秒で先へ進む(チャンクは揃っている)
+  await Promise.race([done, sleep(5000)]);
+  sources.forEach(s=>{ try{s.stop();}catch(_){} });
+
+  const blob = new Blob(chunks, {type: mime.split(";")[0] || "video/mp4"});
+  if(blob.size < 50000){
+    throw new Error("録画データが空でした。ページを再読み込みしてもう一度お試しください");
+  }
+  job.blob = blob;
+  job.url = URL.createObjectURL(blob);
+  job.ext = mime.includes("mp4") ? "mp4":"webm";
+  job.size = (blob.size/1024/1024).toFixed(1);
+  job.detail = "";
+}
+
+// 製作ラインを回す(録画は1本ずつ / 次のジョブの音声は録画中に先読み)
+async function pump(){
+  if(line.running) return;
+  line.running = true;
+  updateLineUI();
+  while(line.queue.length){
+    const job = line.queue[0];
+    line.current = job;
+    try{
+      if(job.status==="失敗") throw new Error(job.err||"音声準備に失敗");
+      if(!job.prepPromise) job.prepPromise = prepareAudio(job);
+      await job.prepPromise;
+      if(job.status==="失敗") throw new Error(job.err||"音声準備に失敗");
+      // 次のジョブの音声を録画中に先読み
+      const nxt = line.queue[1];
+      if(nxt && !nxt.prepPromise){
+        nxt.prepPromise = prepareAudio(nxt).catch(e=>{
+          nxt.status="失敗"; nxt.err = e.message||String(e);
+        });
+      }
+      hc.classList.add("rec");
+      await recordJob(job);
+      job.status="完成";
+    }catch(e){
+      job.status="失敗";
+      job.err = e.message || String(e);
+    }
+    hc.classList.remove("rec");
+    line.queue.shift();
+    line.done.unshift(job);
+    line.current = null;
+    updateLineUI();
+  }
+  line.running = false;
+  updateLineUI();
+}
+
+// ============ 製作ライン表示 ============
+function updateLineUI(){
+  const making = line.current ? 1 : 0;
+  const waiting = line.queue.length - making;
+  const finished = line.done.filter(j=>j.status==="完成").length;
+  lineStatusEl.textContent = `製作中 ${making}本 / 待機 ${Math.max(0,waiting)}本 / 完成 ${finished}本`;
+
+  const rows = [];
+  for(const j of line.queue){
+    rows.push(jobRow(j));
+  }
+  for(const j of line.done){
+    rows.push(jobRow(j));
+  }
+  jobsEl.innerHTML = rows.length ? rows.join("") : '<div class="hint">まだ動画がありません。</div>';
+
+  // 完成ジョブの保存ボタン等にイベント付与
+  for(const j of line.done){
+    const capBtn = document.getElementById("cap-"+j.id);
+    if(capBtn && !capBtn.dataset.bound){
+      capBtn.dataset.bound = "1";
+      capBtn.addEventListener("click", async ()=>{
+        try{ await navigator.clipboard.writeText(j.caption||""); capBtn.textContent="コピーしました!";
+          setTimeout(()=>capBtn.textContent="キャプションをコピー",1500);
+        }catch(e){ alert("コピーできませんでした"); }
+      });
+    }
+    const saveBtn = document.getElementById("save-"+j.id);
+    if(saveBtn && !saveBtn.dataset.bound){
+      saveBtn.dataset.bound = "1";
+      saveBtn.addEventListener("click", (e)=>{ e.preventDefault(); shareJob(j); });
+    }
+  }
+  updateChip();
+}
+
+// 動画の保存: 共有シート(アプリモードでも確実)→ダメならダウンロード
+async function shareJob(j){
+  if(!j.blob) return;
+  const file = new File([j.blob], "hair_"+j.id+"."+j.ext, {type: j.blob.type});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file]});
+      return;
+    }catch(e){
+      if(e && e.name==="AbortError") return; // ユーザーがキャンセル
+    }
+  }
+  const a = document.createElement("a");
+  a.href = j.url; a.download = file.name;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+function jobRow(j){
+  let statusCls = "";
+  if(j.status==="完成") statusCls="ok";
+  else if(j.status==="失敗") statusCls="err";
+  else if(j.status==="音声生成中"||j.status==="録画中"||j.status==="録画待ち") statusCls="working";
+  let body = "";
+  if(j.status==="完成" && j.url){
+    body = `
+      <video src="${j.url}" controls playsinline></video>
+      <a class="dl" href="#" id="save-${j.id}">動画を保存 (${j.size}MB)</a>
+      ${j.caption ? `<button class="secondary cap" id="cap-${j.id}">キャプションをコピー</button>`:""}`;
+  }
+  if(j.status==="失敗"){
+    body = `<div class="js err">エラー: ${esc(j.err||"")}</div>`;
+  }
+  return `
+    <div class="job">
+      <div class="jt">${esc(j.title)}</div>
+      <div class="js ${statusCls}">${j.status}${j.detail?" "+esc(j.detail):""}</div>
+      ${body}
+    </div>`;
+}
+
+function updateChip(){
+  const making = line.current;
+  if(making){
+    chip.style.display = "flex";
+    const waiting = line.queue.length - 1;
+    chipText.innerHTML = `<b>製作中</b> ${esc(making.title)}<br>${esc(making.status)} ${esc(making.detail||"")}${waiting>0 ? "<br>待機 "+waiting+"本":""}`;
+  }else if(line.queue.length){
+    chip.style.display = "flex";
+    chipText.innerHTML = `待機 ${line.queue.length}本`;
+  }else{
+    chip.style.display = "none";
+  }
+}
+
+// ============ 共通 ============
+function workerBase(){
+  let u = document.getElementById("workerUrl").value.trim();
+  if(!u){ alert("Worker URLを入れてください"); return null; }
+  return u.replace(/\/+$/,"");
+}
+function setStatus(el,msg,cls){ el.textContent=msg; el.className="status "+(cls||""); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+document.getElementById("copyCap").addEventListener("click", async ()=>{
+  const t = document.getElementById("caption").value;
+  try{ await navigator.clipboard.writeText(t);
+    document.getElementById("copyCap").textContent="コピーしました!";
+    setTimeout(()=>document.getElementById("copyCap").textContent="キャプションをコピー",1500);
+  }catch(e){ alert("コピーできませんでした。手動で選択してください"); }
+});
+
+// ============ 下書き自動保存・キャプション履歴(端末内保存) ============
+const DRAFT_KEY = "hairtool_draft_v1";
+const HIST_KEY  = "hairtool_history_v1";
+let saveTimer = null;
+function saveDraftDebounced(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveDraft, 400); }
+function saveDraft(){
+  try{
+    const d = {
+      question: document.getElementById("question").value,
+      caption:  document.getElementById("caption").value,
+      imgPrompt: document.getElementById("imgPrompt").value,
+      slides: state.slides, narrs: state.narrs,
+      workerUrl: document.getElementById("workerUrl").value,
+      theme: document.getElementById("theme").value,
+      speaker: document.getElementById("speaker").value,
+      zoom: document.getElementById("zoom").value,
+      badge: document.getElementById("badge").value,
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+  }catch(e){}
+}
+function loadDraft(){
+  try{
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    if(d.question!=null) document.getElementById("question").value = d.question;
+    if(d.caption!=null)  document.getElementById("caption").value  = d.caption;
+    if(d.imgPrompt!=null) document.getElementById("imgPrompt").value = d.imgPrompt;
+    if(Array.isArray(d.slides)) for(let i=0;i<SLIDE_COUNT;i++) state.slides[i]=d.slides[i]||"";
+    if(Array.isArray(d.narrs))  for(let i=0;i<SLIDE_COUNT;i++) state.narrs[i]=d.narrs[i]||"";
+    if(d.workerUrl) document.getElementById("workerUrl").value = d.workerUrl;
+    if(d.theme)   document.getElementById("theme").value   = d.theme;
+    if(d.speaker) document.getElementById("speaker").value = d.speaker;
+    if(d.zoom!=null)  document.getElementById("zoom").value  = d.zoom;
+    if(d.badge!=null) document.getElementById("badge").value = d.badge;
+  }catch(e){}
+}
+function getHistory(){ try{ return JSON.parse(localStorage.getItem(HIST_KEY)||"[]"); }catch(e){ return []; } }
+function pushHistory(job){
+  try{
+    const h = getHistory();
+    h.unshift({ t: job.title, c: job.caption||"", d: new Date().toLocaleString("ja-JP") });
+    localStorage.setItem(HIST_KEY, JSON.stringify(h.slice(0,50)));
+  }catch(e){}
+  renderHistory();
+}
+function renderHistory(){
+  const el = document.getElementById("history");
+  const h = getHistory();
+  if(!h.length){
+    el.innerHTML = '<div class="hint">まだ履歴がありません。キューに追加すると自動で残ります。</div>';
+    return;
+  }
+  el.innerHTML = h.map((x,i)=>`
+    <div class="job">
+      <div class="jt">${esc(x.t)}</div>
+      <div class="js">${esc(x.d)}</div>
+      ${x.c ? `<div class="js" style="margin-top:4px; white-space:pre-wrap">${esc(x.c)}</div>
+      <button class="secondary cap" data-hist="${i}">キャプションをコピー</button>` : ""}
+    </div>`).join("");
+  el.querySelectorAll("[data-hist]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const x = getHistory()[Number(btn.dataset.hist)];
+      if(!x) return;
+      try{ await navigator.clipboard.writeText(x.c); btn.textContent="コピーしました!";
+        setTimeout(()=>btn.textContent="キャプションをコピー",1500);
+      }catch(e){ alert("コピーできませんでした"); }
+    });
+  });
+}
+document.getElementById("clearHist").addEventListener("click", ()=>{
+  if(confirm("キャプション履歴を全部消しますか?")){
+    try{ localStorage.removeItem(HIST_KEY); }catch(e){}
+    renderHistory();
+  }
+});
+// 入力・変更のたびに下書きを自動保存
+document.addEventListener("input", saveDraftDebounced);
+document.addEventListener("change", saveDraftDebounced);
+
+// 初期化
+loadDraft();
+buildSlideCards();
+for(let i=0;i<SLIDE_COUNT;i++) updateThumb(i);
+drawPreview(0);
+renderHistory();
+// 製作モニターに待機画面を描画(録画の確実性のため常にレンダリングしておく)
+renderSlide(hctx, {
+  text:"待機中", img:null, isHook:false,
+  theme: THEMES[document.getElementById("theme").value],
+  badge:"", zoom:0,
+}, 0);
+</script>
+</body>
+</html>
