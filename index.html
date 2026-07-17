@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1c1a1f">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<title>髪ネタ動画メーカー v6.4</title>
+<title>髪ネタ動画メーカー v6.5</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -208,7 +208,7 @@
   <div class="mark">髪</div>
   <h1>髪ネタ動画メーカー<span class="dot">.</span></h1>
   <div class="tag">SCRIPT × VOICE × VIDEO</div>
-  <div class="ver">v6.4</div>
+  <div class="ver">v6.5</div>
 </header>
 
 <!-- 設定 -->
@@ -767,11 +767,12 @@ async function recordJob(job){
   let tcursor = 0.5;
   const items = job.slides.map((s,k)=>{
     const aDur = job.audios[k] ? (job.audios[k].duration / rate) : 0;
-    const it = { idx:k, start:tcursor, dur:Math.max(2.2, aDur+0.9) };
+    const isLast = (k === job.slides.length-1);
+    const it = { idx:k, start:tcursor, dur:Math.max(2.2, aDur + (isLast ? 1.4 : 0.9)) };
     tcursor += it.dur;
     return it;
   });
-  const total = tcursor + 1.0;
+  const total = tcursor + 1.5;
 
   // 重要: 録画開始前にチップを表示し、キャンバスに最初のフレームを描いておく
   // (Safariは未描画キャンバスからの録画開始に失敗して空データを返すことがある)
@@ -850,8 +851,11 @@ async function recordJob(job){
     // 安全装置: 予定時間+3秒で必ず終わらせる
     const guard = setTimeout(finish, (total+3)*1000);
   });
-  // 最後の音声が完全に録り終わるまで少し待ってから停止
-  await sleep(500);
+  // 最後の音声が完全に録り終わるまで待ってから、データを回収して停止
+  // (iOS Safariは停止時に末尾の録画データを取りこぼすことがあるため)
+  await sleep(800);
+  try{ rec.requestData(); }catch(e){}
+  await sleep(300);
   rec.stop();
   // onstopが来ない場合も5秒で先へ進む(チャンクは揃っている)
   await Promise.race([done, sleep(5000)]);
