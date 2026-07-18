@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1c1a1f">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<title>髪ネタ動画メーカー v6.6</title>
+<title>髪ネタ動画メーカー v6.7</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -208,7 +208,7 @@
   <div class="mark">髪</div>
   <h1>髪ネタ動画メーカー<span class="dot">.</span></h1>
   <div class="tag">SCRIPT × VOICE × VIDEO</div>
-  <div class="ver">v6.6</div>
+  <div class="ver">v6.7</div>
 </header>
 
 <!-- 設定 -->
@@ -815,6 +815,14 @@ async function recordJob(job){
     src.start(t0 + it.start);
     sources.push(src);
   }
+  // 音声が「実際に」全部鳴り終わったことを検知する(予定時間ではなく実測)
+  const audioDone = new Promise((resolve)=>{
+    if(!sources.length){ resolve(); return; }
+    let remaining = sources.length;
+    sources.forEach(s=>{ s.onended = ()=>{ if(--remaining <= 0) resolve(); }; });
+    // 万一onendedが来ない場合の保険
+    setTimeout(resolve, (total + 8) * 1000);
+  });
   const startMs = performance.now() + 100;
   // rAFはSafariに止められることがあるため、タイマー方式+安全装置で回す
   await new Promise((resolve)=>{
@@ -851,9 +859,26 @@ async function recordJob(job){
     // 安全装置: 予定時間+3秒で必ず終わらせる
     const guard = setTimeout(finish, (total+3)*1000);
   });
-  // 最後の音声が完全に録り終わるまで待ってから、データを回収して停止
-  // (iOS Safariは停止時に末尾の録画データを取りこぼすことがあるため)
-  await sleep(1200);
+  // 映像の予定時間が終わっても、実際に音声が鳴り終わるまで待つ
+  // その間も最終スライドを描き続けて映像フレームを止めない
+  const lastIdx = items[items.length-1].idx;
+  const keepAlive = setInterval(()=>{
+    try{
+      renderSlide(hctx, {
+        text: job.slides[lastIdx],
+        img: job.imgs[lastIdx],
+        isHook: lastIdx===0,
+        outro: !!(job.outros && job.outros[lastIdx]),
+        theme: job.theme,
+        badge: job.badge,
+        zoom: job.zoom,
+      }, 1);
+    }catch(e){}
+  }, 150);
+  await audioDone;
+  // 「ね!」の後の余韻をたっぷり(1.5秒)取ってから、データを回収して停止
+  await sleep(1500);
+  clearInterval(keepAlive);
   try{ rec.requestData(); }catch(e){}
   await sleep(300);
   rec.stop();
