@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1c1a1f">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<title>髪ネタ動画メーカー v6.8</title>
+<title>髪ネタ動画メーカー v6.9</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -208,7 +208,7 @@
   <div class="mark">髪</div>
   <h1>髪ネタ動画メーカー<span class="dot">.</span></h1>
   <div class="tag">SCRIPT × VOICE × VIDEO</div>
-  <div class="ver">v6.8</div>
+  <div class="ver">v6.9</div>
 </header>
 
 <!-- 設定 -->
@@ -807,18 +807,21 @@ async function recordJob(job){
   });
   const total = tcursor + 2.0;
 
-  // 重要: 録画開始前にチップを表示し、キャンバスに最初のフレームを描いておく
-  // (Safariは未描画キャンバスからの録画開始に失敗して空データを返すことがある)
+  // 重要: 録画開始前の「準備運動」。複数フレームを描いてSafariの録画系を確実に起こす
+  // (未描画・寝ぼけ状態のキャンバスから録画を始めると空データになることがある)
   chip.style.display = "flex";
-  renderSlide(hctx, {
-    text: job.slides[0],
-    img: job.imgs[0],
-    isHook: true,
-    theme: job.theme,
-    badge: job.badge,
-    zoom: job.zoom,
-  }, 0);
-  await sleep(400);
+  for(let w=0; w<6; w++){
+    renderSlide(hctx, {
+      text: job.slides[0],
+      img: job.imgs[0],
+      isHook: true,
+      outro: !!(job.outros && job.outros[0]),
+      theme: job.theme,
+      badge: job.badge,
+      zoom: job.zoom,
+    }, w/100);
+    await sleep(120);
+  }
 
   const dest = ac.createMediaStreamDestination();
   const stream = new MediaStream([
@@ -955,7 +958,18 @@ async function pump(){
         });
       }
       hc.classList.add("rec");
-      await recordJob(job);
+      try{
+        await recordJob(job);
+      }catch(e){
+        // 録画データが空だった場合は、少し待って自動でもう1回だけ録り直す
+        if(String(e && e.message || e).includes("録画データが空")){
+          job.status="再録画中"; job.detail="自動リトライ"; updateLineUI();
+          await sleep(2000);
+          await recordJob(job);
+        }else{
+          throw e;
+        }
+      }
       job.status="完成";
     }catch(e){
       job.status="失敗";
@@ -1028,7 +1042,7 @@ function jobRow(j){
   let statusCls = "";
   if(j.status==="完成") statusCls="ok";
   else if(j.status==="失敗") statusCls="err";
-  else if(j.status==="音声生成中"||j.status==="録画中"||j.status==="録画待ち") statusCls="working";
+  else if(j.status==="音声生成中"||j.status==="録画中"||j.status==="録画待ち"||j.status==="再録画中") statusCls="working";
   let body = "";
   if(j.status==="完成" && j.url){
     body = `
