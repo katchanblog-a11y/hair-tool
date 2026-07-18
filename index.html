@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1c1a1f">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<title>髪ネタ動画メーカー v6.9</title>
+<title>髪ネタ動画メーカー v7</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -208,7 +208,7 @@
   <div class="mark">髪</div>
   <h1>髪ネタ動画メーカー<span class="dot">.</span></h1>
   <div class="tag">SCRIPT × VOICE × VIDEO</div>
-  <div class="ver">v6.9</div>
+  <div class="ver">v7</div>
 </header>
 
 <!-- 設定 -->
@@ -790,12 +790,11 @@ async function prepareAudio(job){
   updateLineUI();
 }
 
-// 録画(1本ずつ・右下ミニ画面に描画)
+// 録画(多段フォールバック方式: 第1形式で空なら既定形式で自動再挑戦)
 async function recordJob(job){
   const ac = getAC();
   await ac.resume();
   const rate = job.rate || 1;
-  // タイムライン(音声の後に余裕を持たせて尻切れ防止)
   let tcursor = 0.5;
   const items = job.slides.map((s,k)=>{
     const bufs = job.audios[k];
@@ -807,39 +806,66 @@ async function recordJob(job){
   });
   const total = tcursor + 2.0;
 
-  // 重要: 録画開始前の「準備運動」。複数フレームを描いてSafariの録画系を確実に起こす
-  // (未描画・寝ぼけ状態のキャンバスから録画を始めると空データになることがある)
+  // 形式の候補: 対応している第1候補 → Safariお任せの既定形式
+  let preferred = "";
+  for(const m of ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"]){
+    if(MediaRecorder.isTypeSupported(m)){ preferred = m; break; }
+  }
+  const candidates = preferred ? [preferred, ""] : [""];
+  let lastInfo = "";
+  for(let a=0; a<candidates.length; a++){
+    if(a>0){
+      job.status="再録画中"; job.detail="別形式で再挑戦"; updateLineUI();
+      await sleep(1200);
+    }
+    const r = await attemptRecord(job, items, total, candidates[a], rate);
+    lastInfo = r.info;
+    if(r.blob && r.blob.size >= 50000){
+      job.blob = r.blob;
+      job.url = URL.createObjectURL(r.blob);
+      job.ext = (r.type||"").includes("webm") ? "webm" : "mp4";
+      job.size = (r.blob.size/1024/1024).toFixed(1);
+      job.detail = "";
+      return;
+    }
+  }
+  throw new Error("録画データが空でした("+lastInfo+")。ページを再読み込みしてもう一度お試しください");
+}
+
+// 1回分の録画の実行
+async function attemptRecord(job, items, total, mime, rate){
+  const ac = getAC();
+  // 準備運動: 複数フレーム描画で録画系を起こす
   chip.style.display = "flex";
   for(let w=0; w<6; w++){
     renderSlide(hctx, {
-      text: job.slides[0],
-      img: job.imgs[0],
-      isHook: true,
+      text: job.slides[0], img: job.imgs[0], isHook:true,
       outro: !!(job.outros && job.outros[0]),
-      theme: job.theme,
-      badge: job.badge,
-      zoom: job.zoom,
+      theme: job.theme, badge: job.badge, zoom: job.zoom,
     }, w/100);
     await sleep(120);
   }
-
   const dest = ac.createMediaStreamDestination();
   const stream = new MediaStream([
     ...hc.captureStream(30).getVideoTracks(),
     ...dest.stream.getAudioTracks(),
   ]);
-  let mime = "";
-  for(const m of ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"]){
-    if(MediaRecorder.isTypeSupported(m)){ mime=m; break; }
+  let rec;
+  try{
+    rec = mime ? new MediaRecorder(stream, {mimeType:mime}) : new MediaRecorder(stream);
+  }catch(e){
+    rec = new MediaRecorder(stream);
+    mime = "";
   }
-  const rec = new MediaRecorder(stream, mime?{mimeType:mime}:undefined);
   const chunks=[];
-  rec.ondataavailable = e=>{ if(e.data.size) chunks.push(e.data); };
+  let recErr = "";
+  rec.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+  rec.onerror = e=>{ recErr = String((e && e.error) || e); };
   const done = new Promise(res=> rec.onstop = res);
 
   job.status="録画中"; updateLineUI();
   rec.start(500);
-  const t0 = ac.currentTime + 0.1;
+  const t0 = ac.currentTime + 0.15;
   const sources = [];
   for(const it of items){
     const bufs = job.audios[it.idx];
@@ -855,26 +881,24 @@ async function recordJob(job){
       sources.push(src);
     }
   }
-  // 音声が「実際に」全部鳴り終わったことを検知する(予定時間ではなく実測)
+  // 音声が「実際に」全部鳴り終わったことを検知する
   const audioDone = new Promise((resolve)=>{
     if(!sources.length){ resolve(); return; }
     let remaining = sources.length;
-    sources.forEach(s=>{ s.onended = ()=>{ if(--remaining <= 0) resolve(); }; });
-    // 万一onendedが来ない場合の保険
+    sources.forEach(sr=>{ sr.onended = ()=>{ if(--remaining <= 0) resolve(); }; });
     setTimeout(resolve, (total + 8) * 1000);
   });
   const startMs = performance.now() + 100;
-  // rAFはSafariに止められることがあるため、タイマー方式+安全装置で回す
   await new Promise((resolve)=>{
     let finished = false;
+    let iv = null, guard = null;
     const finish = ()=>{
       if(finished) return;
       finished = true;
-      clearInterval(iv);
-      clearTimeout(guard);
+      clearInterval(iv); clearTimeout(guard);
       resolve();
     };
-    const iv = setInterval(()=>{
+    iv = setInterval(()=>{
       try{
         const el = (performance.now()-startMs)/1000;
         if(el >= total){ finish(); return; }
@@ -882,59 +906,40 @@ async function recordJob(job){
         for(const it of items){ if(el >= it.start) cur = it; }
         const t = Math.min(1, Math.max(0,(el-cur.start)/cur.dur));
         renderSlide(hctx, {
-          text: job.slides[cur.idx],
-          img: job.imgs[cur.idx],
-          isHook: cur.idx===0,
+          text: job.slides[cur.idx], img: job.imgs[cur.idx], isHook: cur.idx===0,
           outro: !!(job.outros && job.outros[cur.idx]),
-          theme: job.theme,
-          badge: job.badge,
-          zoom: job.zoom,
+          theme: job.theme, badge: job.badge, zoom: job.zoom,
         }, t);
-        job.detail = "残り"+Math.max(0,Math.ceil(total-el))+"秒";
+        job.detail = "残り"+Math.max(0,Math.ceil(total-el))+"秒" + (mime ? "" : "(既定形式)");
         updateChip();
-      }catch(e){
-        finish();
-      }
+      }catch(e){ finish(); }
     }, 50);
-    // 安全装置: 予定時間+3秒で必ず終わらせる
-    const guard = setTimeout(finish, (total+3)*1000);
+    guard = setTimeout(finish, (total+3)*1000);
   });
-  // 映像の予定時間が終わっても、実際に音声が鳴り終わるまで待つ
-  // その間も最終スライドを描き続けて映像フレームを止めない
+  // 音声の実終了を待つ間も最終スライドを描き続ける
   const lastIdx = items[items.length-1].idx;
   const keepAlive = setInterval(()=>{
     try{
       renderSlide(hctx, {
-        text: job.slides[lastIdx],
-        img: job.imgs[lastIdx],
-        isHook: lastIdx===0,
+        text: job.slides[lastIdx], img: job.imgs[lastIdx], isHook: lastIdx===0,
         outro: !!(job.outros && job.outros[lastIdx]),
-        theme: job.theme,
-        badge: job.badge,
-        zoom: job.zoom,
+        theme: job.theme, badge: job.badge, zoom: job.zoom,
       }, 1);
     }catch(e){}
   }, 150);
   await audioDone;
-  // 「ね!」の後の余韻をたっぷり(1.5秒)取ってから、データを回収して停止
   await sleep(1500);
   clearInterval(keepAlive);
   try{ rec.requestData(); }catch(e){}
   await sleep(300);
-  rec.stop();
-  // onstopが来ない場合も5秒で先へ進む(チャンクは揃っている)
+  try{ rec.stop(); }catch(e){}
   await Promise.race([done, sleep(5000)]);
-  sources.forEach(s=>{ try{s.stop();}catch(_){} });
+  sources.forEach(sr=>{ try{sr.stop();}catch(_){} });
 
-  const blob = new Blob(chunks, {type: mime.split(";")[0] || "video/mp4"});
-  if(blob.size < 50000){
-    throw new Error("録画データが空でした。ページを再読み込みしてもう一度お試しください");
-  }
-  job.blob = blob;
-  job.url = URL.createObjectURL(blob);
-  job.ext = mime.includes("mp4") ? "mp4":"webm";
-  job.size = (blob.size/1024/1024).toFixed(1);
-  job.detail = "";
+  const type = ((rec.mimeType || mime || "video/mp4").split(";")[0]) || "video/mp4";
+  const blob = new Blob(chunks, {type});
+  const info = "形式:" + (mime || "既定") + " 断片:" + chunks.length + (recErr ? " err:" + recErr.slice(0,60) : "");
+  return { blob, type, info };
 }
 
 // 製作ラインを回す(録画は1本ずつ / 次のジョブの音声は録画中に先読み)
