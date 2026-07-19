@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#1c1a1f">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="manifest" href="manifest.json">
-<title>髪ネタ動画メーカー v7</title>
+<title>髪ネタ動画メーカー v7.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -208,7 +208,7 @@
   <div class="mark">髪</div>
   <h1>髪ネタ動画メーカー<span class="dot">.</span></h1>
   <div class="tag">SCRIPT × VOICE × VIDEO</div>
-  <div class="ver">v7</div>
+  <div class="ver">v7.1</div>
 </header>
 
 <!-- 設定 -->
@@ -832,9 +832,15 @@ async function recordJob(job){
   throw new Error("録画データが空でした("+lastInfo+")。ページを再読み込みしてもう一度お試しください");
 }
 
-// 1回分の録画の実行
+// 1回分の録画の実行(録画専用の新しいAudioContextで行う)
 async function attemptRecord(job, items, total, mime, rate){
-  const ac = getAC();
+  // 重要: 長い準備時間の後、既存のAudioContextはiPadに休止させられていることがある。
+  // 休止したまま録画すると音声トラックが完全停止し「断片:0」になるため、
+  // 録画のたびに新品のコンテキストを作り、無音信号で常時駆動する。
+  const ACctor = window.AudioContext || window.webkitAudioContext;
+  const rc = new ACctor();
+  await rc.resume();
+
   // 準備運動: 複数フレーム描画で録画系を起こす
   chip.style.display = "flex";
   for(let w=0; w<6; w++){
@@ -845,7 +851,23 @@ async function attemptRecord(job, items, total, mime, rate){
     }, w/100);
     await sleep(120);
   }
-  const dest = ac.createMediaStreamDestination();
+
+  const dest = rc.createMediaStreamDestination();
+  // 無音の下地を流し続けて、音声トラックを最初から最後まで確実に動かす
+  let silence = null;
+  if(rc.createConstantSource){
+    silence = rc.createConstantSource();
+    silence.offset.value = 0;
+    silence.connect(dest);
+    silence.start();
+  }else{
+    const sb = rc.createBuffer(1, rc.sampleRate, rc.sampleRate);
+    silence = rc.createBufferSource();
+    silence.buffer = sb; silence.loop = true;
+    silence.connect(dest);
+    silence.start();
+  }
+
   const stream = new MediaStream([
     ...hc.captureStream(30).getVideoTracks(),
     ...dest.stream.getAudioTracks(),
@@ -865,14 +887,14 @@ async function attemptRecord(job, items, total, mime, rate){
 
   job.status="録画中"; updateLineUI();
   rec.start(500);
-  const t0 = ac.currentTime + 0.15;
+  const t0 = rc.currentTime + 0.2;
   const sources = [];
   for(const it of items){
     const bufs = job.audios[it.idx];
     if(!bufs) continue;
     let cursor = t0 + it.start;
     for(const buf of bufs){
-      const src = ac.createBufferSource();
+      const src = rc.createBufferSource();
       src.buffer = buf;
       src.playbackRate.value = rate;
       src.connect(dest);
@@ -935,6 +957,8 @@ async function attemptRecord(job, items, total, mime, rate){
   try{ rec.stop(); }catch(e){}
   await Promise.race([done, sleep(5000)]);
   sources.forEach(sr=>{ try{sr.stop();}catch(_){} });
+  try{ silence.stop(); }catch(e){}
+  try{ rc.close(); }catch(e){}
 
   const type = ((rec.mimeType || mime || "video/mp4").split(";")[0]) || "video/mp4";
   const blob = new Blob(chunks, {type});
